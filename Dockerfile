@@ -19,4 +19,4 @@ COPY --from=builder /app/target/*.jar app.jar
 # Expose the port the app runs on
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-XX:+UseSerialGC", "-Xss256k", "-Xms128m", "-Xmx200m", "-XX:MaxMetaspaceSize=80m", "-XX:ReservedCodeCacheSize=48m", "-XX:TieredStopAtLevel=1", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-XX:+UseSerialGC", "-Xss256k", "-Xms128m", "-Xmx256m", "-XX:MaxMetaspaceSize=160m", "-XX:ReservedCodeCacheSize=64m", "-XX:TieredStopAtLevel=1", "-jar", "app.jar"]
