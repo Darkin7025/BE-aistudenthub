@@ -692,6 +692,7 @@ public class DocumentService {
         String documentKey = doc.getId().toString().replace("-", "") + "_" + System.currentTimeMillis();
 
         String callbackUrl = appBaseUrl + "/api/v1/documents/" + doc.getId() + "/onlyoffice-callback";
+        log.info("Generated OnlyOffice config for document {}: callbackUrl={}, appBaseUrl={}", documentId, callbackUrl, appBaseUrl);
 
         com.example.swp391.aistudenthub.feature.document.dto.response.OnlyOfficeConfigResponse.Permissions permissions = com.example.swp391.aistudenthub.feature.document.dto.response.OnlyOfficeConfigResponse.Permissions
                 .builder()
