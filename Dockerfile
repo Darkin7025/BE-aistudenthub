@@ -2,8 +2,8 @@
 FROM maven:3.9.6-eclipse-temurin-17 AS builder
 WORKDIR /app
 COPY pom.xml .
-# Standard Tier (2GB RAM, 1 CPU) — cho phép Maven dùng nhiều RAM hơn để build nhanh hơn
-ENV MAVEN_OPTS="-Xmx1g"
+# Tối ưu hóa bộ nhớ khi build Maven
+ENV MAVEN_OPTS="-Xmx1024m -XX:+UseSerialGC"
 # Download dependencies first to cache them
 RUN mvn dependency:go-offline -B
 # Copy the source code and build the application
@@ -19,5 +19,5 @@ COPY --from=builder /app/target/*.jar app.jar
 # Expose the port the app runs on
 EXPOSE 8080
 
-# Run the application optimized for Standard Tier (2GB RAM, 1 CPU)
-ENTRYPOINT ["java", "-XX:+UseG1GC", "-XX:MaxRAMPercentage=75.0", "-XX:MaxMetaspaceSize=256m", "-jar", "app.jar"]
+# Tối ưu hóa JVM cho gói Free (512MB RAM, 0.1 CPU)
+ENTRYPOINT ["java", "-XX:+UseSerialGC", "-Xss256k", "-XX:MaxRAMPercentage=50.0", "-XX:MaxMetaspaceSize=100m", "-XX:ActiveProcessorCount=1", "-jar", "app.jar"]
