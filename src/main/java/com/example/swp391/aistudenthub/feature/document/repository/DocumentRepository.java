@@ -154,4 +154,10 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
     void updateUploadStatus(
             @org.springframework.data.repository.query.Param("id") UUID id,
             @org.springframework.data.repository.query.Param("uploadStatus") com.example.swp391.aistudenthub.feature.document.enums.UploadStatus uploadStatus);
+
+    /**
+     * Count pending documents
+     */
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(d) FROM Document d WHERE d.visibility = 'PENDING' AND d.deletedAt IS NULL")
+    Long countPendingDocuments();
 }
