@@ -84,6 +84,11 @@ public class DocumentService {
 
         Map<String, String> uploadResult = cloudinaryService.upload(file);
 
+        DocumentVisibility targetVisibility = request.getVisibility() != null ? request.getVisibility() : DocumentVisibility.PUBLIC;
+        if (targetVisibility == DocumentVisibility.PUBLIC) {
+            targetVisibility = DocumentVisibility.PENDING;
+        }
+
         Document doc = Document.builder()
                 .userId(userId)
                 .title(request.getTitle().trim())
@@ -97,7 +102,7 @@ public class DocumentService {
                 .storageKey(uploadResult.get("public_id"))
                 .storageResourceType(uploadResult.get("resource_type"))
                 .storageBucket("cloudinary")
-                .visibility(request.getVisibility() != null ? request.getVisibility() : DocumentVisibility.PUBLIC)
+                .visibility(targetVisibility)
                 .subject(request.getSubject())
                 .major(request.getMajor())
                 .documentType(request.getDocumentType())
@@ -275,7 +280,11 @@ public class DocumentService {
         doc.setCustomMetadata(request.getCustomMetadata());
 
         if (request.getVisibility() != null) {
-            doc.setVisibility(request.getVisibility());
+            DocumentVisibility targetVisibility = request.getVisibility();
+            if (targetVisibility == DocumentVisibility.PUBLIC && doc.getVisibility() != DocumentVisibility.PUBLIC) {
+                targetVisibility = DocumentVisibility.PENDING;
+            }
+            doc.setVisibility(targetVisibility);
         }
 
         if (request.getExtractedText() != null) {

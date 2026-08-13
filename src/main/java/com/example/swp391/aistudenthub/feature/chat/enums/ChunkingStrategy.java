@@ -20,5 +20,11 @@ public enum ChunkingStrategy {
      * Chia theo câu (sentence).
      * Phù hợp cho tài liệu ngắn hoặc Q&A pairs.
      */
-    SENTENCE
+    SENTENCE,
+
+    /**
+     * Chia theo đề mục mục lục (chữ số La Mã và danh mục phụ).
+     */
+    HEADLINE_ROMAN
 }
+

@@ -21,12 +21,12 @@ public interface ChunkingService {
     List<TextChunk> chunkText(String text, ChunkingStrategy strategy);
     
     /**
-     * Chia văn bản với strategy mặc định (FIXED_SIZE).
+     * Chia văn bản với strategy mặc định (HEADLINE_ROMAN).
      *
      * @param text Văn bản cần chia
      * @return List các text chunks
      */
     default List<TextChunk> chunkText(String text) {
-        return chunkText(text, ChunkingStrategy.FIXED_SIZE);
+        return chunkText(text, ChunkingStrategy.HEADLINE_ROMAN);
     }
 }

@@ -26,7 +26,7 @@ public class AistudenthubApplication {
 		app.run(args);
 	}
 
-	private static java.util.Map<String, Object> loadEnvMap() {
+	static java.util.Map<String, Object> loadEnvMap() {
 		java.util.Map<String, Object> props = new java.util.HashMap<>();
 		File envFile = new File(".env");
 		if (envFile.exists()) {

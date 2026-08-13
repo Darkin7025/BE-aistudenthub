@@ -26,6 +26,9 @@ public class ChunkingServiceImpl implements ChunkingService {
     private static final Pattern PARAGRAPH_PATTERN = 
         Pattern.compile("\\n\\s*\\n");
     
+    private static final Pattern HEADLINE_PATTERN = 
+        Pattern.compile("^\\s*([IVXLCDM]+\\.|[a-z][\\.\\)])");
+    
     @Override
     public List<TextChunk> chunkText(String text, ChunkingStrategy strategy) {
         if (!StringUtils.hasText(text)) {
@@ -39,6 +42,7 @@ public class ChunkingServiceImpl implements ChunkingService {
             case FIXED_SIZE -> chunkByFixedSize(text);
             case PARAGRAPH -> chunkByParagraph(text);
             case SENTENCE -> chunkBySentence(text);
+            case HEADLINE_ROMAN -> chunkByHeadlineRoman(text);
         };
         
         log.info("Created {} chunks", chunks.size());
@@ -210,5 +214,95 @@ public class ChunkingServiceImpl implements ChunkingService {
         }
         
         return chunks;
+    }
+
+    private List<TextChunk> chunkByHeadlineRoman(String text) {
+        String[] lines = text.split("\\r?\\n");
+        List<TextChunk> chunks = new ArrayList<>();
+        List<String> currentLines = new ArrayList<>();
+        int chunkIndex = 0;
+        int wordPosition = 0;
+        
+        // Define the overlap size (number of words to overlap)
+        int overlapWordCount = 120; // within 100 - 150 words range
+        
+        for (String line : lines) {
+            String trimmedLine = line.trim();
+            if (trimmedLine.isEmpty()) {
+                continue;
+            }
+            
+            // Check if this line is a boundary (matches Roman numeral or subcategory format)
+            boolean isBoundary = HEADLINE_PATTERN.matcher(line).find();
+            
+            int currentWordCount = countWords(currentLines);
+            boolean isTooLarge = currentWordCount + countWords(line) > 1000;
+            
+            if ((isBoundary || isTooLarge) && !currentLines.isEmpty()) {
+                // Save current chunk
+                String chunkContent = String.join("\n", currentLines);
+                String[] words = chunkContent.split("\\s+");
+                int tokenCount = words.length;
+                
+                TextChunk chunk = TextChunk.builder()
+                        .content(chunkContent)
+                        .startPosition(wordPosition)
+                        .endPosition(wordPosition + tokenCount)
+                        .tokenCount(tokenCount)
+                        .chunkIndex(chunkIndex++)
+                        .build();
+                chunks.add(chunk);
+                
+                wordPosition += tokenCount;
+                
+                // Get the overlap from the end of this chunk
+                List<String> overlapWords = new ArrayList<>();
+                int startIdx = Math.max(0, words.length - overlapWordCount);
+                for (int i = startIdx; i < words.length; i++) {
+                    overlapWords.add(words[i]);
+                }
+                
+                // Start new chunk and pre-populate with the overlap words
+                currentLines.clear();
+                if (!overlapWords.isEmpty()) {
+                    currentLines.add(String.join(" ", overlapWords));
+                }
+            }
+            
+            currentLines.add(line);
+        }
+        
+        // Save the last chunk
+        if (!currentLines.isEmpty()) {
+            String chunkContent = String.join("\n", currentLines);
+            String[] words = chunkContent.split("\\s+");
+            int tokenCount = words.length;
+            
+            TextChunk chunk = TextChunk.builder()
+                    .content(chunkContent)
+                    .startPosition(wordPosition)
+                    .endPosition(wordPosition + tokenCount)
+                    .tokenCount(tokenCount)
+                    .chunkIndex(chunkIndex)
+                    .build();
+            chunks.add(chunk);
+        }
+        
+        return chunks;
+    }
+
+    private int countWords(String text) {
+        if (text == null || text.isBlank()) {
+            return 0;
+        }
+        return text.trim().split("\\s+").length;
+    }
+
+    private int countWords(List<String> lines) {
+        int count = 0;
+        for (String line : lines) {
+            count += countWords(line);
+        }
+        return count;
     }
 }

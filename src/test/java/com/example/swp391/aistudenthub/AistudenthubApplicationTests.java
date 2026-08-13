@@ -9,6 +9,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 @SpringBootTest
 class AistudenthubApplicationTests {
 
+	@org.springframework.test.context.DynamicPropertySource
+	static void registerEnvProperties(org.springframework.test.context.DynamicPropertyRegistry registry) {
+		java.util.Map<String, Object> envProperties = AistudenthubApplication.loadEnvMap();
+		envProperties.forEach((key, value) -> registry.add(key, () -> value));
+	}
+
 	@Autowired
 	private EmailService emailService;
 
