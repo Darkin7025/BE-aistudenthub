@@ -13,6 +13,7 @@ import org.springframework.util.StringUtils;
 public class DocumentMapper {
 
     private final DocumentPreviewResolver previewResolver;
+    private final com.example.swp391.aistudenthub.feature.auth.repository.UserRepository userRepository;
 
     public DocumentResponse toResponse(Document doc) {
         if (doc == null) {
@@ -21,6 +22,13 @@ public class DocumentMapper {
 
         PreviewMode previewMode = previewResolver.resolveMode(doc.getOriginalFileName(), doc.getFileType());
         boolean aiSupported = previewResolver.isAiCapable(previewMode) && StringUtils.hasText(doc.getExtractedText());
+
+        String creatorName = null;
+        if (doc.getUserId() != null) {
+            creatorName = userRepository.findByIdAndDeletedAtIsNull(doc.getUserId())
+                    .map(user -> user.getFullName())
+                    .orElse("Unknown");
+        }
 
         return DocumentResponse.builder()
                 .id(doc.getId())
@@ -40,6 +48,8 @@ public class DocumentMapper {
                 .uploadStatus(doc.getUploadStatus())
                 .uploadProgress(doc.getUploadProgress())
                 .createdAt(doc.getCreatedAt())
+                .creatorId(doc.getUserId())
+                .creatorName(creatorName)
                 .customMetadata(doc.getCustomMetadata())
                 .extractedText(doc.getExtractedText())
                 .build();

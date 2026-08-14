@@ -47,6 +47,9 @@ public class DocumentResponse {
 
     private OffsetDateTime createdAt;
     
+    private UUID creatorId;
+    private String creatorName;
+    
     private String customMetadata;
     private String extractedText;
 }
