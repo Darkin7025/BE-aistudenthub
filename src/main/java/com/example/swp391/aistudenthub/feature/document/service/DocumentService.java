@@ -905,7 +905,7 @@ public class DocumentService {
 
         share = documentShareRepository.save(share);
 
-        String documentViewUrl = appBaseUrl + "/documents/" + documentId;
+        String documentViewUrl = "aistudenthub-fe.vercel.app/dashboard/documents/" + documentId;
         String sharerName = userRepository.findById(currentUserId)
                 .map(com.example.swp391.aistudenthub.feature.auth.entity.User::getFullName)
                 .orElse("Someone");
