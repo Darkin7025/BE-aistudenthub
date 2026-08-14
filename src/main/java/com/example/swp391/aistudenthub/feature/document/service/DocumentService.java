@@ -69,6 +69,7 @@ public class DocumentService {
     private final PaymentOrderRepository paymentOrderRepository;
     private final com.example.swp391.aistudenthub.feature.auth.repository.UserRepository userRepository;
     private final com.example.swp391.aistudenthub.feature.document.repository.DocumentShareRepository documentShareRepository;
+    private final com.example.swp391.aistudenthub.feature.auth.service.EmailService emailService;
 
     @Value("${app.backend-url:${app.base-url:http://localhost:8080}}")
     private String appBaseUrl;
@@ -903,6 +904,12 @@ public class DocumentService {
                 .build();
 
         share = documentShareRepository.save(share);
+
+        String documentViewUrl = appBaseUrl + "/documents/" + documentId;
+        String sharerName = userRepository.findById(currentUserId)
+                .map(com.example.swp391.aistudenthub.feature.auth.entity.User::getFullName)
+                .orElse("Someone");
+        emailService.sendDocumentSharedEmail(targetUser.getEmail(), targetUser.getFullName(), sharerName, document.getTitle(), documentViewUrl);
 
         return com.example.swp391.aistudenthub.feature.document.dto.response.DocumentShareResponse.builder()
                 .id(share.getId())

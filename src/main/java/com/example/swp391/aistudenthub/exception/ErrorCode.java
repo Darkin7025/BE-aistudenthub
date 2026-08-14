@@ -28,10 +28,12 @@ public enum ErrorCode {
     INVALID_FILE_TYPE("Loại file không được hỗ trợ", HttpStatus.BAD_REQUEST),
     EMPTY_FILE("File không được rỗng", HttpStatus.BAD_REQUEST),
     DOCUMENT_NOT_FOUND("Tài liệu không tồn tại", HttpStatus.NOT_FOUND),
+    REPORT_NOT_FOUND("Báo cáo không tồn tại", HttpStatus.NOT_FOUND),
     UPLOAD_FAILED("Upload file thất bại, vui lòng thử lại", HttpStatus.INTERNAL_SERVER_ERROR),
     DOCUMENT_CONTENT_NOT_AVAILABLE("Nội dung tài liệu chưa được xử lý hoặc loại file này chưa hỗ trợ AI.",
             HttpStatus.BAD_REQUEST),
     FORBIDDEN_ACCESS("Bạn không có quyền thực hiện thao tác này", HttpStatus.FORBIDDEN),
+    INVALID_REPORT_STATUS("Trạng thái báo cáo không hợp lệ", HttpStatus.BAD_REQUEST),
 
     // Chat
     CHAT_SESSION_MODE_MISMATCH("This chat session is linked to a document. Use document chat for this session.", HttpStatus.BAD_REQUEST),

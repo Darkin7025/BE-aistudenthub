@@ -65,6 +65,55 @@ public class EmailService {
         }
     }
 
+    @Async
+    public void sendDocumentSharedEmail(String toEmail, String recipientName, String sharerName, String documentTitle, String documentUrl) {
+        if (toEmail == null || toEmail.isBlank()) {
+            return;
+        }
+
+        Map<String, Object> body = Map.of(
+                "sender", Map.of("email", fromEmail, "name", fromName),
+                "to", List.of(Map.of("email", toEmail)),
+                "subject", "[AI Study Hub] Bạn nhận được tài liệu được chia sẻ",
+                "htmlContent", buildSharedDocumentEmailHtml(recipientName, sharerName, documentTitle, documentUrl)
+        );
+
+        try {
+            restClient.post()
+                    .uri("/smtp/email")
+                    .header("api-key", apiKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(body)
+                    .retrieve()
+                    .toBodilessEntity();
+
+            log.info("Document shared email sent successfully to {}", toEmail);
+        } catch (Exception e) {
+            log.error("Failed to send document shared email to {}: {}", toEmail, e.getMessage());
+        }
+    }
+
+    private String buildSharedDocumentEmailHtml(String recipientName, String sharerName, String documentTitle, String documentUrl) {
+        String safeRecipientName = recipientName == null || recipientName.isBlank() ? "User" : recipientName;
+        String safeSharerName = sharerName == null || sharerName.isBlank() ? "Someone" : sharerName;
+        String safeDocumentTitle = documentTitle == null || documentTitle.isBlank() ? "Document" : documentTitle;
+        String safeDocumentUrl = documentUrl == null || documentUrl.isBlank() ? baseUrl : documentUrl;
+
+        return "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"><title>Document Shared</title></head>"
+                + "<body style=\"margin:0;padding:0;background:#f4f4f5;font-family:Arial,sans-serif;\">"
+                + "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f4f4f5;padding:32px 16px;\"><tr><td align=\"center\">"
+                + "<table width=\"100%\" style=\"max-width:600px;background:#ffffff;border-radius:10px;overflow:hidden;\"><tr>"
+                + "<td style=\"background:#111827;padding:18px 24px;color:#ffffff;font-size:20px;font-weight:700;\">AI Student Hub</td></tr>"
+                + "<tr><td style=\"padding:32px 28px;color:#111827;font-size:15px;line-height:1.8;\">"
+                + "<p style=\"margin:0 0 12px;\">Hi " + safeRecipientName.replace("<", "&lt;") + ",</p>"
+                + "<p style=\"margin:0 0 12px;\">" + safeSharerName.replace("<", "&lt;") + " has shared a document with you.</p>"
+                + "<p style=\"margin:0 0 12px;\">Document: " + safeDocumentTitle.replace("<", "&lt;") + "</p>"
+                + "<p style=\"margin:0 0 12px;\">Click here to view the document:</p>"
+                + "<p style=\"margin:0 0 16px;\"><a href=\"" + safeDocumentUrl + "\" style=\"display:inline-block;padding:10px 20px;background:#111827;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;\">View Document</a></p>"
+                + "<p style=\"margin:0;color:#6b7280;font-size:14px;\">AI Student Hub</p>"
+                + "</td></tr></table></td></tr></table></body></html>";
+    }
+
     /**
      * Dùng String.replace() thay vì .formatted() để tránh lỗi
      * UnknownFormatConversionException do ký tự % trong CSS (vd: border-radius:50%)
