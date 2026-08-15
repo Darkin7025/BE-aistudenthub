@@ -54,6 +54,11 @@ public class DocumentMapper {
                 .creatorEmail(creatorEmail)
                 .customMetadata(doc.getCustomMetadata())
                 .extractedText(doc.getExtractedText())
+                .approvalStatus(doc.getApprovalStatus())
+                .dmcaVerified(doc.getDmcaVerified())
+                .dmcaVerifiedAt(doc.getDmcaVerifiedAt())
+                .dmcaVerifiedBy(doc.getDmcaVerifiedBy())
+                .rejectionReason(doc.getRejectionReason())
                 .build();
     }
 

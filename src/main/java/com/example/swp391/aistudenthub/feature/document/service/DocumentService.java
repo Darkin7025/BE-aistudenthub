@@ -87,8 +87,9 @@ public class DocumentService {
         Map<String, String> uploadResult = cloudinaryService.upload(file);
 
         DocumentVisibility targetVisibility = request.getVisibility() != null ? request.getVisibility() : DocumentVisibility.PUBLIC;
+        com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus approvalStatus = com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED;
         if (targetVisibility == DocumentVisibility.PUBLIC) {
-            targetVisibility = DocumentVisibility.PENDING;
+            approvalStatus = com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.PENDING;
         }
 
         Document doc = Document.builder()
@@ -105,6 +106,7 @@ public class DocumentService {
                 .storageResourceType(uploadResult.get("resource_type"))
                 .storageBucket("cloudinary")
                 .visibility(targetVisibility)
+                .approvalStatus(approvalStatus)
                 .subject(request.getSubject())
                 .major(request.getMajor())
                 .documentType(request.getDocumentType())
@@ -183,17 +185,19 @@ public class DocumentService {
         Document doc = documentRepository.findByIdAndDeletedAtIsNull(documentId)
                 .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
 
-        boolean isPublic = com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC
-                .equals(doc.getVisibility());
-        if (isPublic) {
+        boolean isPublicApproved = com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC.equals(doc.getVisibility())
+                && com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED.equals(doc.getApprovalStatus());
+
+        if (isPublicApproved) {
             checkPublicDocumentsFeatureEnabled();
-        }
-        if (!isPublic) {
+        } else {
             if (currentUser == null) {
                 throw new AppException(ErrorCode.FORBIDDEN_ACCESS);
             }
-            if (!doc.getUserId().equals(currentUser.getId())
-                    && !com.example.swp391.aistudenthub.feature.auth.entity.Role.ADMIN.equals(currentUser.getRole())) {
+            boolean isOwnerOrStaff = doc.getUserId().equals(currentUser.getId())
+                    || com.example.swp391.aistudenthub.feature.auth.entity.Role.ADMIN.equals(currentUser.getRole())
+                    || com.example.swp391.aistudenthub.feature.auth.entity.Role.MODERATOR.equals(currentUser.getRole());
+            if (!isOwnerOrStaff) {
                 boolean isShared = documentShareRepository.existsByDocumentIdAndSharedWithUserId(doc.getId(),
                         currentUser.getId());
                 if (!isShared) {
@@ -238,17 +242,19 @@ public class DocumentService {
         Document doc = documentRepository.findByIdAndDeletedAtIsNull(documentId)
                 .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
 
-        boolean isPublic = com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC
-                .equals(doc.getVisibility());
-        if (isPublic) {
+        boolean isPublicApproved = com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC.equals(doc.getVisibility())
+                && com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED.equals(doc.getApprovalStatus());
+
+        if (isPublicApproved) {
             checkPublicDocumentsFeatureEnabled();
-        }
-        if (!isPublic) {
+        } else {
             if (currentUser == null) {
                 throw new AppException(ErrorCode.FORBIDDEN_ACCESS);
             }
-            if (!doc.getUserId().equals(currentUser.getId())
-                    && !com.example.swp391.aistudenthub.feature.auth.entity.Role.ADMIN.equals(currentUser.getRole())) {
+            boolean isOwnerOrStaff = doc.getUserId().equals(currentUser.getId())
+                    || com.example.swp391.aistudenthub.feature.auth.entity.Role.ADMIN.equals(currentUser.getRole())
+                    || com.example.swp391.aistudenthub.feature.auth.entity.Role.MODERATOR.equals(currentUser.getRole());
+            if (!isOwnerOrStaff) {
                 boolean isShared = documentShareRepository.existsByDocumentIdAndSharedWithUserId(doc.getId(),
                         currentUser.getId());
                 if (!isShared) {
@@ -536,17 +542,23 @@ public class DocumentService {
     private void checkPreviewPermission(
             Document doc,
             com.example.swp391.aistudenthub.feature.auth.entity.User currentUser) {
-        boolean isOwnerOrAdmin = doc.getUserId().equals(currentUser.getId())
-                || com.example.swp391.aistudenthub.feature.auth.entity.Role.ADMIN.equals(currentUser.getRole());
+        boolean isOwnerOrAdminOrMod = currentUser != null && (doc.getUserId().equals(currentUser.getId())
+                || com.example.swp391.aistudenthub.feature.auth.entity.Role.ADMIN.equals(currentUser.getRole())
+                || com.example.swp391.aistudenthub.feature.auth.entity.Role.MODERATOR.equals(currentUser.getRole()));
 
-        if (isOwnerOrAdmin) {
+        if (isOwnerOrAdminOrMod) {
             return;
         }
 
-        if (com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC
-                .equals(doc.getVisibility())) {
+        boolean isPublicApproved = com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC.equals(doc.getVisibility())
+                && com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED.equals(doc.getApprovalStatus());
+
+        if (isPublicApproved) {
             checkPublicDocumentsFeatureEnabled();
         } else {
+            if (currentUser == null) {
+                throw new AppException(ErrorCode.FORBIDDEN_ACCESS);
+            }
             boolean isShared = documentShareRepository.existsByDocumentIdAndSharedWithUserId(doc.getId(),
                     currentUser.getId());
             if (!isShared) {
@@ -959,5 +971,70 @@ public class DocumentService {
                         () -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND, "Không tìm thấy dữ liệu chia sẻ này"));
 
         documentShareRepository.delete(share);
+    }
+
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<DocumentResponse> getPendingDocuments(org.springframework.data.domain.Pageable pageable) {
+        return documentRepository.findPendingPublicDocuments(pageable)
+                .map(documentMapper::toResponse);
+    }
+
+    @Transactional
+    public DocumentResponse approveDocument(UUID documentId, UUID moderatorId) {
+        Document doc = documentRepository.findByIdAndDeletedAtIsNull(documentId)
+                .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
+
+        if (!com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC.equals(doc.getVisibility())
+                || !com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.PENDING.equals(doc.getApprovalStatus())) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Tài liệu này không ở trạng thái chờ duyệt công khai.");
+        }
+
+        doc.setApprovalStatus(com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED);
+        doc.setDmcaVerified(true);
+        doc.setDmcaVerifiedAt(java.time.OffsetDateTime.now());
+        doc.setDmcaVerifiedBy(moderatorId);
+
+        Document saved = documentRepository.save(doc);
+        return documentMapper.toResponse(saved);
+    }
+
+    @Transactional
+    public DocumentResponse rejectDocument(UUID documentId, String reason, UUID moderatorId) {
+        Document doc = documentRepository.findByIdAndDeletedAtIsNull(documentId)
+                .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
+
+        if (!com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC.equals(doc.getVisibility())
+                || !com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.PENDING.equals(doc.getApprovalStatus())) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Tài liệu này không ở trạng thái chờ duyệt công khai.");
+        }
+
+        doc.setApprovalStatus(com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.REJECTED);
+        doc.setRejectionReason(reason);
+        doc.setDmcaVerifiedAt(java.time.OffsetDateTime.now());
+        doc.setDmcaVerifiedBy(moderatorId);
+
+        Document saved = documentRepository.save(doc);
+        return documentMapper.toResponse(saved);
+    }
+
+    @Transactional
+    public DocumentResponse takedownDocument(UUID documentId, UUID moderatorId) {
+        Document doc = documentRepository.findByIdAndDeletedAtIsNull(documentId)
+                .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
+
+        doc.setApprovalStatus(com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.DMCA_TAKEN_DOWN);
+        doc.setDmcaVerifiedAt(java.time.OffsetDateTime.now());
+        doc.setDmcaVerifiedBy(moderatorId);
+
+        Document saved = documentRepository.save(doc);
+
+        // Xóa vector chunks của AI
+        try {
+            documentProcessor.deleteChunks(documentId);
+        } catch (Exception e) {
+            log.error("Failed to delete chunks for takedown document {}", documentId, e);
+        }
+
+        return documentMapper.toResponse(saved);
     }
 }

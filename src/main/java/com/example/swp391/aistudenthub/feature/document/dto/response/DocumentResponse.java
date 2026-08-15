@@ -57,4 +57,10 @@ public class DocumentResponse {
     
     private String customMetadata;
     private String extractedText;
+
+    private com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus approvalStatus;
+    private Boolean dmcaVerified;
+    private OffsetDateTime dmcaVerifiedAt;
+    private UUID dmcaVerifiedBy;
+    private String rejectionReason;
 }

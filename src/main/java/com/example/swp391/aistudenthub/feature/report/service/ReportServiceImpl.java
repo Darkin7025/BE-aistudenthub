@@ -28,6 +28,7 @@ public class ReportServiceImpl implements ReportService {
     private final ReportRepository reportRepository;
     private final DocumentRepository documentRepository;
     private final UserRepository userRepository;
+    private final com.example.swp391.aistudenthub.feature.document.service.DocumentService documentService;
 
     @Override
     @Transactional
@@ -35,8 +36,9 @@ public class ReportServiceImpl implements ReportService {
         Document document = documentRepository.findByIdAndDeletedAtIsNull(documentId)
                 .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
 
-        if (!DocumentVisibility.PUBLIC.equals(document.getVisibility())) {
-            throw new AppException(ErrorCode.INVALID_REQUEST, "Chỉ có thể report tài liệu đang ở trạng thái PUBLIC.");
+        if (!DocumentVisibility.PUBLIC.equals(document.getVisibility())
+                || !com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED.equals(document.getApprovalStatus())) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Chỉ có thể report tài liệu đang ở trạng thái PUBLIC và đã được phê duyệt.");
         }
 
         User reporter = userRepository.findById(reporterId)
@@ -103,8 +105,7 @@ public class ReportServiceImpl implements ReportService {
 
         if (ReportStatus.RESOLVED.equals(decision)) {
             Document document = report.getDocument();
-            document.setVisibility(DocumentVisibility.PRIVATE);
-            documentRepository.save(document);
+            documentService.takedownDocument(document.getId(), moderator.getId());
             report.setStatus(ReportStatus.RESOLVED);
         } else {
             report.setStatus(ReportStatus.DISMISSED);
@@ -112,5 +113,11 @@ public class ReportServiceImpl implements ReportService {
 
         log.info("Report {} reviewed by moderator {} with decision {}", reportId, moderator.getId(), decision);
         return reportRepository.save(report);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<Report> searchReports(ReportStatus status, ReportReason reason, org.springframework.data.domain.Pageable pageable) {
+        return reportRepository.searchReports(status, reason, pageable);
     }
 }

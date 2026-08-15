@@ -18,4 +18,12 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
     List<Report> findByStatusOrderByCreatedAtDesc(ReportStatus status);
 
     List<Report> findAllByOrderByCreatedAtDesc();
+
+    @org.springframework.data.jpa.repository.Query("SELECT r FROM Report r WHERE " +
+           "(:status IS NULL OR r.status = :status) AND " +
+           "(:reason IS NULL OR r.reason = :reason)")
+    org.springframework.data.domain.Page<Report> searchReports(
+            @org.springframework.data.repository.query.Param("status") com.example.swp391.aistudenthub.feature.report.enums.ReportStatus status,
+            @org.springframework.data.repository.query.Param("reason") com.example.swp391.aistudenthub.feature.report.enums.ReportReason reason,
+            org.springframework.data.domain.Pageable pageable);
 }

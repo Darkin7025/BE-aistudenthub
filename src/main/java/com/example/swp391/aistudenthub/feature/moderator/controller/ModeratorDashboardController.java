@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/v1/moderator/dashboard")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('MODERATOR')")
+@PreAuthorize("hasRole('ADMIN') or hasRole('MODERATOR')")
 @Tag(name = "Moderator - Dashboard", description = "Thống kê dashboard cho Moderator")
 @Slf4j
 public class ModeratorDashboardController {
@@ -51,9 +51,9 @@ public class ModeratorDashboardController {
         summary = "Tổng quan thống kê duyệt tài liệu",
         description = "Trả về số lượng tài liệu chờ duyệt, đã duyệt và bị từ chối cho moderator hiện tại"
     )
-    public ResponseEntity<ApiResponse<DashboardStatsDto>> getDashboardStats(Authentication authentication) {
-        // Extract moderator ID from authentication
-        UUID moderatorId = UUID.fromString(authentication.getName());
+    public ResponseEntity<ApiResponse<DashboardStatsDto>> getDashboardStats(@org.springframework.security.core.annotation.AuthenticationPrincipal User currentUser) {
+        // Extract moderator ID from currentUser
+        UUID moderatorId = currentUser.getId();
         
         DashboardStatsDto stats = moderationService.getDashboardStats(moderatorId);
         return ResponseEntity.ok(ApiResponse.success(stats));
@@ -108,9 +108,9 @@ public class ModeratorDashboardController {
     )
     public ResponseEntity<ApiResponse<ModerationResponseDto>> approveDocument(
             @RequestBody ApproveDocumentRequest request,
-            Authentication authentication) {
+            @org.springframework.security.core.annotation.AuthenticationPrincipal User currentUser) {
         
-        UUID moderatorId = UUID.fromString(authentication.getName());
+        UUID moderatorId = currentUser.getId();
         log.info("Approving document {} by moderator {}", request.getDocumentId(), moderatorId);
         
         // Get document
@@ -118,8 +118,7 @@ public class ModeratorDashboardController {
                 .orElseThrow(() -> new RuntimeException("Document not found"));
         
         // Get moderator
-        User moderator = userRepository.findById(moderatorId)
-                .orElseThrow(() -> new RuntimeException("Moderator not found"));
+        User moderator = currentUser;
         
         // Approve document
         var moderation = moderationService.approveDocument(request.getDocumentId(), moderatorId, moderator, document);
@@ -149,9 +148,9 @@ public class ModeratorDashboardController {
     )
     public ResponseEntity<ApiResponse<ModerationResponseDto>> rejectDocument(
             @RequestBody RejectDocumentRequest request,
-            Authentication authentication) {
+            @org.springframework.security.core.annotation.AuthenticationPrincipal User currentUser) {
         
-        UUID moderatorId = UUID.fromString(authentication.getName());
+        UUID moderatorId = currentUser.getId();
         log.info("Rejecting document {} by moderator {}", request.getDocumentId(), moderatorId);
         
         // Get document
@@ -159,8 +158,7 @@ public class ModeratorDashboardController {
                 .orElseThrow(() -> new RuntimeException("Document not found"));
         
         // Get moderator
-        User moderator = userRepository.findById(moderatorId)
-                .orElseThrow(() -> new RuntimeException("Moderator not found"));
+        User moderator = currentUser;
         
         // Reject document
         var moderation = moderationService.rejectDocument(request.getDocumentId(), moderatorId, moderator, document, request.getReason());
@@ -188,8 +186,8 @@ public class ModeratorDashboardController {
         summary = "Lịch sử duyệt tài liệu",
         description = "Trả về danh sách tất cả tài liệu đã duyệt bởi moderator hiện tại"
     )
-    public ResponseEntity<ApiResponse<List<ModerationResponseDto>>> getModerationHistory(Authentication authentication) {
-        UUID moderatorId = UUID.fromString(authentication.getName());
+    public ResponseEntity<ApiResponse<List<ModerationResponseDto>>> getModerationHistory(@org.springframework.security.core.annotation.AuthenticationPrincipal User currentUser) {
+        UUID moderatorId = currentUser.getId();
         log.info("Fetching moderation history for moderator {}", moderatorId);
         
         var moderations = moderationService.getModerationHistoryByModeratorId(moderatorId);
@@ -208,5 +206,45 @@ public class ModeratorDashboardController {
                 .collect(Collectors.toList());
         
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * POST /api/v1/moderator/dashboard/dmca-takedown
+     * Gỡ bỏ tài liệu vi phạm bản quyền (DMCA Takedown)
+     */
+    @PostMapping("/dmca-takedown")
+    @Operation(
+        summary = "Gỡ bỏ tài liệu vi phạm bản quyền (DMCA Takedown)",
+        description = "Gỡ bỏ tài liệu khẩn cấp và xóa các vector chunks của AI"
+    )
+    public ResponseEntity<ApiResponse<ModerationResponseDto>> takedownDocument(
+            @RequestBody com.example.swp391.aistudenthub.feature.moderator.dto.TakedownDocumentRequest request,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal User currentUser) {
+        
+        UUID moderatorId = currentUser.getId();
+        log.info("DMCA takedown for document {} by moderator {}", request.getDocumentId(), moderatorId);
+        
+        // Get document
+        Document document = documentRepository.findById(request.getDocumentId())
+                .orElseThrow(() -> new RuntimeException("Document not found"));
+        
+        // Get moderator
+        User moderator = currentUser;
+        
+        // Takedown document
+        var moderation = moderationService.takedownDocument(request.getDocumentId(), moderatorId, moderator, document);
+        
+        ModerationResponseDto response = ModerationResponseDto.builder()
+                .moderationId(moderation.getModerationId())
+                .documentId(moderation.getDocument().getId())
+                .documentTitle(moderation.getDocument().getTitle())
+                .moderatorId(moderation.getModerator().getId())
+                .moderatorName(moderation.getModerator().getFullName())
+                .action(moderation.getAction().toString())
+                .reason(moderation.getReason())
+                .createdAt(moderation.getCreatedAt())
+                .build();
+        
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
 }

@@ -142,6 +142,11 @@ public class DocumentProcessor {
         }
     }
 
+    public void deleteChunks(UUID documentId) {
+        documentChunkRepository.deleteByDocumentId(documentId);
+        log.info("Deleted chunks for document: {}", documentId);
+    }
+
     private byte[] downloadFile(String fileUrl) throws Exception {
         URL url = new URL(fileUrl);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();

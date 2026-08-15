@@ -34,4 +34,9 @@ public interface ModerationService {
      * Get moderation history by moderator
      */
     List<Moderation> getModerationHistoryByModeratorId(UUID moderatorId);
+
+    /**
+     * Takedown a document due to DMCA/Copyright violation
+     */
+    Moderation takedownDocument(UUID documentId, UUID moderatorId, User moderator, Document document);
 }

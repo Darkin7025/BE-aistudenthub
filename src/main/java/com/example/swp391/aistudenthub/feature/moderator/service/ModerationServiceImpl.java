@@ -22,6 +22,7 @@ public class ModerationServiceImpl implements ModerationService {
 
     private final ModerationRepository moderationRepository;
     private final DocumentRepository documentRepository;
+    private final com.example.swp391.aistudenthub.feature.document.service.DocumentProcessor documentProcessor;
 
     /**
      * Get moderation dashboard statistics
@@ -51,8 +52,12 @@ public class ModerationServiceImpl implements ModerationService {
     public Moderation approveDocument(UUID documentId, UUID moderatorId, User moderator, Document document) {
         log.info("Approving document {} by moderator {}", documentId, moderatorId);
 
-        // Update document visibility to PUBLIC
+        // Update document visibility to PUBLIC and approvalStatus to APPROVED
         document.setVisibility(DocumentVisibility.PUBLIC);
+        document.setApprovalStatus(com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED);
+        document.setDmcaVerified(true);
+        document.setDmcaVerifiedAt(java.time.OffsetDateTime.now());
+        document.setDmcaVerifiedBy(moderatorId);
         documentRepository.save(document);
 
         // Create moderation record
@@ -74,8 +79,12 @@ public class ModerationServiceImpl implements ModerationService {
     public Moderation rejectDocument(UUID documentId, UUID moderatorId, User moderator, Document document, String reason) {
         log.info("Rejecting document {} by moderator {}", documentId, moderatorId);
 
-        // Update document visibility to PRIVATE
+        // Update document visibility to PRIVATE and approvalStatus to REJECTED
         document.setVisibility(DocumentVisibility.PRIVATE);
+        document.setApprovalStatus(com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.REJECTED);
+        document.setRejectionReason(reason);
+        document.setDmcaVerifiedAt(java.time.OffsetDateTime.now());
+        document.setDmcaVerifiedBy(moderatorId);
         documentRepository.save(document);
 
         // Create moderation record
@@ -96,7 +105,7 @@ public class ModerationServiceImpl implements ModerationService {
     public List<Document> getPendingDocuments() {
         log.info("Fetching all pending documents");
         return documentRepository.findAll().stream()
-                .filter(d -> d.getVisibility() == DocumentVisibility.PENDING && d.getDeletedAt() == null)
+                .filter(d -> (((d.getVisibility() == DocumentVisibility.PUBLIC && d.getApprovalStatus() == com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.PENDING) || d.getVisibility() == DocumentVisibility.PENDING) && d.getDeletedAt() == null))
                 .toList();
     }
 
@@ -109,5 +118,34 @@ public class ModerationServiceImpl implements ModerationService {
         return moderationRepository.findAll().stream()
                 .filter(m -> m.getModerator().getId().equals(moderatorId))
                 .toList();
+    }
+
+    @Override
+    @Transactional
+    public Moderation takedownDocument(UUID documentId, UUID moderatorId, User moderator, Document document) {
+        log.info("Taking down document {} by moderator {}", documentId, moderatorId);
+
+        // Update document status to DMCA_TAKEN_DOWN
+        document.setApprovalStatus(com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.DMCA_TAKEN_DOWN);
+        document.setDmcaVerifiedAt(java.time.OffsetDateTime.now());
+        document.setDmcaVerifiedBy(moderatorId);
+        documentRepository.save(document);
+
+        // Delete AI chunks
+        try {
+            documentProcessor.deleteChunks(documentId);
+        } catch (Exception e) {
+            log.error("Failed to delete chunks for takedown document {}", documentId, e);
+        }
+
+        // Create moderation record
+        Moderation moderation = Moderation.builder()
+                .document(document)
+                .moderator(moderator)
+                .action(Moderation.ModerationAction.REJECTED)
+                .reason("DMCA Takedown due to copyright violation")
+                .build();
+
+        return moderationRepository.save(moderation);
     }
 }

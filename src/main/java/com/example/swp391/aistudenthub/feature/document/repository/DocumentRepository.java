@@ -50,7 +50,8 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
     java.util.List<String> findDistinctMajorsByUserId(@org.springframework.data.repository.query.Param("userId") UUID userId);
 
     @org.springframework.data.jpa.repository.Query("SELECT d FROM Document d WHERE d.deletedAt IS NULL " +
-            "AND d.visibility = com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC AND " +
+            "AND d.visibility = com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC " +
+            "AND d.approvalStatus = com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED AND " +
             "(:keyword IS NULL OR LOWER(CAST(d.title AS string)) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%')) OR LOWER(CAST(d.description AS string)) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%'))) AND " +
             "(:subject IS NULL OR d.subject = :subject) AND " +
             "(:major IS NULL OR d.major = :major)")
@@ -60,10 +61,14 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
             @org.springframework.data.repository.query.Param("major") String major,
             org.springframework.data.domain.Pageable pageable);
 
-    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT d.subject FROM Document d WHERE d.deletedAt IS NULL AND d.visibility = com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC AND d.subject IS NOT NULL AND d.subject != ''")
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT d.subject FROM Document d WHERE d.deletedAt IS NULL " +
+            "AND d.visibility = com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC " +
+            "AND d.approvalStatus = com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED AND d.subject IS NOT NULL AND d.subject != ''")
     java.util.List<String> findDistinctPublicSubjects();
 
-    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT d.major FROM Document d WHERE d.deletedAt IS NULL AND d.visibility = com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC AND d.major IS NOT NULL AND d.major != ''")
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT d.major FROM Document d WHERE d.deletedAt IS NULL " +
+            "AND d.visibility = com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC " +
+            "AND d.approvalStatus = com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED AND d.major IS NOT NULL AND d.major != ''")
     java.util.List<String> findDistinctPublicMajors();
 
     /**
@@ -71,7 +76,8 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
      * Tìm kiếm documents PUBLIC theo keyword, subject, major.
      */
     @org.springframework.data.jpa.repository.Query("SELECT d FROM Document d WHERE d.deletedAt IS NULL " +
-            "AND d.visibility = com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC AND " +
+            "AND d.visibility = com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC " +
+            "AND d.approvalStatus = com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED AND " +
             "(:keyword IS NULL OR LOWER(CAST(d.title AS string)) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%')) OR LOWER(CAST(d.description AS string)) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%'))) AND " +
             "(:subject IS NULL OR d.subject = :subject) AND " +
             "(:major IS NULL OR d.major = :major)")
@@ -158,6 +164,12 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
     /**
      * Count pending documents
      */
-    @org.springframework.data.jpa.repository.Query("SELECT COUNT(d) FROM Document d WHERE d.visibility = 'PENDING' AND d.deletedAt IS NULL")
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(d) FROM Document d WHERE d.deletedAt IS NULL AND d.visibility = com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC AND d.approvalStatus = com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.PENDING")
     Long countPendingDocuments();
+
+    @org.springframework.data.jpa.repository.Query("SELECT d FROM Document d WHERE d.deletedAt IS NULL AND d.visibility = com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC AND d.approvalStatus = com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.PENDING")
+    org.springframework.data.domain.Page<Document> findPendingPublicDocuments(org.springframework.data.domain.Pageable pageable);
+
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(d) FROM Document d WHERE d.deletedAt IS NULL AND d.visibility = com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC AND d.approvalStatus = com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.PENDING")
+    Long countPendingPublicDocuments();
 }

@@ -2,68 +2,74 @@ package com.example.swp391.aistudenthub.feature.report.controller;
 
 import com.example.swp391.aistudenthub.common.dto.ApiResponse;
 import com.example.swp391.aistudenthub.feature.auth.entity.User;
-import com.example.swp391.aistudenthub.feature.auth.repository.UserRepository;
 import com.example.swp391.aistudenthub.feature.document.entity.Document;
 import com.example.swp391.aistudenthub.feature.document.repository.DocumentRepository;
-import com.example.swp391.aistudenthub.feature.report.dto.CreateReportRequest;
+import com.example.swp391.aistudenthub.feature.report.dto.ResolveReportRequest;
 import com.example.swp391.aistudenthub.feature.report.dto.ReportResponse;
-import com.example.swp391.aistudenthub.feature.report.dto.ReviewReportRequest;
+import com.example.swp391.aistudenthub.feature.report.dto.SubmitReportRequest;
 import com.example.swp391.aistudenthub.feature.report.entity.Report;
+import com.example.swp391.aistudenthub.feature.report.enums.ReportReason;
+import com.example.swp391.aistudenthub.feature.report.enums.ReportStatus;
 import com.example.swp391.aistudenthub.feature.report.service.ReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/reports")
 @RequiredArgsConstructor
-@Tag(name = "Report", description = "Report document APIs")
-public class ReportController {
+@Tag(name = "Report & Moderation", description = "Các API báo cáo vi phạm và giải quyết báo cáo")
+@org.springframework.transaction.annotation.Transactional
+public class AdminReportController {
 
     private final ReportService reportService;
     private final DocumentRepository documentRepository;
-    private final UserRepository userRepository;
 
-    @PostMapping
+    @PostMapping("/api/v1/documents/{id}/report")
     @PreAuthorize("hasRole('USER')")
-    @Operation(summary = "Student tạo report cho document đang public")
-    public ResponseEntity<ApiResponse<ReportResponse>> createReport(
-            @Valid @RequestBody CreateReportRequest request,
+    @Operation(summary = "Sinh viên gửi báo cáo vi phạm cho tài liệu")
+    public ResponseEntity<ApiResponse<ReportResponse>> submitReport(
+            @PathVariable UUID id,
+            @Valid @RequestBody SubmitReportRequest request,
             @AuthenticationPrincipal User currentUser) {
-
-        Report report = reportService.createReport(request.getDocumentId(), currentUser.getId(), request.getReason(), request.getDescription());
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(toResponse(report), "Report đã được gửi thành công"));
+        Report report = reportService.createReport(id, currentUser.getId(), request.getReason(), request.getDescription());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(toResponse(report), "Gửi báo cáo vi phạm thành công."));
     }
 
-    @GetMapping("/pending")
-    @PreAuthorize("hasRole('MODERATOR')")
-    @Operation(summary = "Moderator xem danh sách report đang PENDING")
-    public ResponseEntity<ApiResponse<List<ReportResponse>>> getPendingReports() {
-        List<ReportResponse> response = reportService.getPendingReports().stream()
-                .map(this::toResponse)
-                .toList();
-        return ResponseEntity.ok(ApiResponse.success(response));
+    @GetMapping("/api/v1/admin/reports")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MODERATOR')")
+    @Operation(summary = "Admin/Moderator xem danh sách báo cáo vi phạm")
+    public ResponseEntity<ApiResponse<Page<ReportResponse>>> getReports(
+            @RequestParam(required = false) ReportStatus status,
+            @RequestParam(required = false) ReportReason reason,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 50));
+        Page<ReportResponse> result = reportService.searchReports(status, reason, pageable)
+                .map(this::toResponse);
+        return ResponseEntity.ok(ApiResponse.success(result));
     }
 
-    @PostMapping("/{reportId}/review")
-    @PreAuthorize("hasRole('MODERATOR')")
-    @Operation(summary = "Moderator xử lý report, có thể DISMISSED hoặc RESOLVED")
-    public ResponseEntity<ApiResponse<ReportResponse>> reviewReport(
+    @PutMapping("/api/v1/admin/reports/{reportId}/resolve")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MODERATOR')")
+    @Operation(summary = "Admin/Moderator giải quyết báo cáo vi phạm")
+    public ResponseEntity<ApiResponse<ReportResponse>> resolveReport(
             @PathVariable Long reportId,
-            @Valid @RequestBody ReviewReportRequest request,
+            @Valid @RequestBody ResolveReportRequest request,
             @AuthenticationPrincipal User currentUser) {
-
         Report report = reportService.reviewReport(reportId, currentUser, request.getDecision(), request.getModeratorNote());
-        return ResponseEntity.ok(ApiResponse.success(toResponse(report), "Report đã được xử lý"));
+        return ResponseEntity.ok(ApiResponse.success(toResponse(report), "Đã xử lý báo cáo vi phạm thành công."));
     }
 
     private ReportResponse toResponse(Report report) {

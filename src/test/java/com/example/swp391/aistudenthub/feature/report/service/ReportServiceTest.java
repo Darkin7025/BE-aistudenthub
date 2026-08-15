@@ -4,6 +4,7 @@ import com.example.swp391.aistudenthub.exception.AppException;
 import com.example.swp391.aistudenthub.feature.auth.entity.User;
 import com.example.swp391.aistudenthub.feature.auth.repository.UserRepository;
 import com.example.swp391.aistudenthub.feature.document.entity.Document;
+import com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus;
 import com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility;
 import com.example.swp391.aistudenthub.feature.document.repository.DocumentRepository;
 import com.example.swp391.aistudenthub.feature.report.entity.Report;
@@ -16,7 +17,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -36,6 +36,9 @@ class ReportServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private com.example.swp391.aistudenthub.feature.document.service.DocumentService documentService;
+
     @InjectMocks
     private ReportServiceImpl reportService;
 
@@ -47,6 +50,7 @@ class ReportServiceTest {
         document.setId(documentId);
         document.setUserId(UUID.randomUUID());
         document.setVisibility(DocumentVisibility.PUBLIC);
+        document.setApprovalStatus(ApprovalStatus.APPROVED);
         document.setTitle("Test doc");
 
         when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
@@ -63,12 +67,13 @@ class ReportServiceTest {
     }
 
     @Test
-    void resolveReport_shouldSetDocumentToPrivateWhenReportIsValid() {
+    void resolveReport_shouldTakedownDocumentWhenReportIsValid() {
         UUID documentId = UUID.randomUUID();
         UUID moderatorId = UUID.randomUUID();
         Document document = new Document();
         document.setId(documentId);
         document.setVisibility(DocumentVisibility.PUBLIC);
+        document.setApprovalStatus(ApprovalStatus.APPROVED);
 
         User moderator = new User();
         moderator.setId(moderatorId);
@@ -77,17 +82,16 @@ class ReportServiceTest {
         report.setId(1L);
         report.setDocument(document);
         report.setStatus(ReportStatus.PENDING);
-        report.setReason(ReportReason.COPYRIGHT);
+        report.setReason(ReportReason.COPYRIGHT_VIOLATION);
         report.setDescription("It is copied");
 
         when(reportRepository.findById(1L)).thenReturn(Optional.of(report));
-        when(documentRepository.save(any(Document.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(reportRepository.save(any(Report.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Report resolved = reportService.resolveReport(1L, moderator, "MAKE_PRIVATE", "Removed for copyright issue");
 
         assertEquals(ReportStatus.RESOLVED, resolved.getStatus());
-        assertEquals(DocumentVisibility.PRIVATE, document.getVisibility());
+        verify(documentService, times(1)).takedownDocument(documentId, moderatorId);
         assertEquals(moderatorId, resolved.getReviewedBy().getId());
         assertNotNull(resolved.getReviewedAt());
     }

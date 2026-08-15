@@ -99,6 +99,24 @@ public class Document {
     @Column(name = "storage_bucket", nullable = false) // nơi lưu trữ
     private String storageBucket;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "approval_status")
+    @Builder.Default
+    private com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus approvalStatus = com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED;
+
+    @Column(name = "dmca_verified")
+    @Builder.Default
+    private Boolean dmcaVerified = false;
+
+    @Column(name = "dmca_verified_at")
+    private OffsetDateTime dmcaVerifiedAt;
+
+    @Column(name = "dmca_verified_by")
+    private UUID dmcaVerifiedBy;
+
+    @Column(name = "rejection_reason", length = 500)
+    private String rejectionReason;
+
     @PrePersist
     protected void onCreate() {
         createdAt = OffsetDateTime.now();

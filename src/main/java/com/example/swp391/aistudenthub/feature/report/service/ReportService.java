@@ -17,4 +17,6 @@ public interface ReportService {
     Report reviewReport(Long reportId, User moderator, ReportStatus decision, String moderatorNote);
 
     Report resolveReport(Long reportId, User moderator, String action, String moderatorNote);
+
+    org.springframework.data.domain.Page<Report> searchReports(ReportStatus status, ReportReason reason, org.springframework.data.domain.Pageable pageable);
 }
