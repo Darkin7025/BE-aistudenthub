@@ -49,6 +49,11 @@ public class DocumentResponse {
     
     private UUID creatorId;
     private String creatorName;
+    private String creatorEmail;
+
+    private UUID sharedByUserId;
+    private String sharedByUserName;
+    private String sharedByUserEmail;
     
     private String customMetadata;
     private String extractedText;

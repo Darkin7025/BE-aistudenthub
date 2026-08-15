@@ -24,10 +24,11 @@ public class DocumentMapper {
         boolean aiSupported = previewResolver.isAiCapable(previewMode) && StringUtils.hasText(doc.getExtractedText());
 
         String creatorName = null;
+        String creatorEmail = null;
         if (doc.getUserId() != null) {
-            creatorName = userRepository.findByIdAndDeletedAtIsNull(doc.getUserId())
-                    .map(user -> user.getFullName())
-                    .orElse("Unknown");
+            var creatorOpt = userRepository.findByIdAndDeletedAtIsNull(doc.getUserId());
+            creatorName = creatorOpt.map(com.example.swp391.aistudenthub.feature.auth.entity.User::getFullName).orElse("Unknown");
+            creatorEmail = creatorOpt.map(com.example.swp391.aistudenthub.feature.auth.entity.User::getEmail).orElse(null);
         }
 
         return DocumentResponse.builder()
@@ -50,8 +51,19 @@ public class DocumentMapper {
                 .createdAt(doc.getCreatedAt())
                 .creatorId(doc.getUserId())
                 .creatorName(creatorName)
+                .creatorEmail(creatorEmail)
                 .customMetadata(doc.getCustomMetadata())
                 .extractedText(doc.getExtractedText())
                 .build();
+    }
+
+    public DocumentResponse toResponse(Document doc, com.example.swp391.aistudenthub.feature.auth.entity.User sharedByUser) {
+        DocumentResponse response = toResponse(doc);
+        if (response != null && sharedByUser != null) {
+            response.setSharedByUserId(sharedByUser.getId());
+            response.setSharedByUserName(sharedByUser.getFullName());
+            response.setSharedByUserEmail(sharedByUser.getEmail());
+        }
+        return response;
     }
 }

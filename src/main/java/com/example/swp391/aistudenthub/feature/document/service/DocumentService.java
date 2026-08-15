@@ -146,6 +146,12 @@ public class DocumentService {
         List<Document> owned = documentRepository.findByUserIdAndDeletedAtIsNullOrderByCreatedAtDesc(userId);
         List<com.example.swp391.aistudenthub.feature.document.entity.DocumentShare> shares = documentShareRepository
                 .findBySharedWithUserIdOrderByCreatedAtDesc(userId);
+
+        java.util.Map<UUID, com.example.swp391.aistudenthub.feature.document.entity.DocumentShare> shareMap = new java.util.HashMap<>();
+        for (var share : shares) {
+            shareMap.putIfAbsent(share.getDocumentId(), share);
+        }
+
         List<Document> shared = shares.stream()
                 .map(share -> documentRepository.findByIdAndDeletedAtIsNull(share.getDocumentId()).orElse(null))
                 .filter(doc -> doc != null)
@@ -160,7 +166,14 @@ public class DocumentService {
         allDocs.sort((d1, d2) -> d2.getCreatedAt().compareTo(d1.getCreatedAt()));
 
         return allDocs.stream()
-                .map(documentMapper::toResponse)
+                .map(doc -> {
+                    var share = shareMap.get(doc.getId());
+                    if (share != null) {
+                        com.example.swp391.aistudenthub.feature.auth.entity.User sharer = userRepository.findByIdAndDeletedAtIsNull(share.getSharedByUserId()).orElse(null);
+                        return documentMapper.toResponse(doc, sharer);
+                    }
+                    return documentMapper.toResponse(doc);
+                })
                 .toList();
     }
 
@@ -919,9 +932,15 @@ public class DocumentService {
                 .findBySharedWithUserIdOrderByCreatedAtDesc(currentUserId);
 
         return shares.stream()
-                .map(share -> documentRepository.findByIdAndDeletedAtIsNull(share.getDocumentId()).orElse(null))
-                .filter(doc -> doc != null)
-                .map(documentMapper::toResponse)
+                .map(share -> {
+                    Document doc = documentRepository.findByIdAndDeletedAtIsNull(share.getDocumentId()).orElse(null);
+                    if (doc == null) {
+                        return null;
+                    }
+                    com.example.swp391.aistudenthub.feature.auth.entity.User sharer = userRepository.findByIdAndDeletedAtIsNull(share.getSharedByUserId()).orElse(null);
+                    return documentMapper.toResponse(doc, sharer);
+                })
+                .filter(java.util.Objects::nonNull)
                 .toList();
     }
 
