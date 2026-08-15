@@ -23,6 +23,7 @@ public class AiQuotaService {
     private final UserRepository userRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final SystemConfigRepository systemConfigRepository;
+    private final com.example.swp391.aistudenthub.feature.payment.service.UserPlanResolverService userPlanResolverService;
 
     /** Reserves one question while holding the user row lock to prevent concurrent bypasses. */
     @Transactional
@@ -49,7 +50,7 @@ public class AiQuotaService {
         OffsetDateTime now = OffsetDateTime.now();
         OffsetDateTime startOfDay = now.toLocalDate().atStartOfDay().atOffset(now.getOffset());
         OffsetDateTime resetAt = startOfDay.plusDays(1);
-        int limit = resolveDailyLimit();
+        int limit = resolveDailyLimit(userId);
         long used = chatMessageRepository.countUserQuestionsSince(userId, startOfDay);
 
         return ChatQuotaResponse.builder()
@@ -60,7 +61,14 @@ public class AiQuotaService {
                 .build();
     }
 
-    private int resolveDailyLimit() {
+    private int resolveDailyLimit(UUID userId) {
+        com.example.swp391.aistudenthub.feature.payment.service.UserPlanResolverService.UserPlanLimits planLimits = 
+                userPlanResolverService.resolveLimits(userId);
+
+        if (planLimits.isPremium()) {
+            return planLimits.aiDailyLimit();
+        }
+
         return systemConfigRepository.findById(DAILY_LIMIT_CONFIG_KEY)
                 .map(config -> parseLimit(config.getConfigValue()))
                 .orElse(DEFAULT_DAILY_LIMIT);

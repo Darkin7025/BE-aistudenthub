@@ -18,6 +18,7 @@ public class PaymentResponse {
     private UUID id;
     private Long orderCode;
     private UUID userId;
+    private UUID planId;
     private Integer amount;
     private String description;
     private PaymentStatus status;

@@ -70,6 +70,7 @@ public class DocumentService {
     private final com.example.swp391.aistudenthub.feature.auth.repository.UserRepository userRepository;
     private final com.example.swp391.aistudenthub.feature.document.repository.DocumentShareRepository documentShareRepository;
     private final com.example.swp391.aistudenthub.feature.auth.service.EmailService emailService;
+    private final com.example.swp391.aistudenthub.feature.payment.service.UserPlanResolverService userPlanResolverService;
 
     @Value("${app.backend-url:${app.base-url:http://localhost:8080}}")
     private String appBaseUrl;
@@ -130,24 +131,13 @@ public class DocumentService {
 
     private void checkDocumentLimit(UUID userId) {
         long currentDocsCount = documentRepository.countByUserIdAndDeletedAtIsNull(userId);
-        Optional<PaymentOrder> latestPaidOrder = paymentOrderRepository
-                .findFirstByUserIdAndStatusOrderByCreatedAtDesc(userId, PaymentStatus.PAID);
-        int limit = 50;
-        String tierName = "Cơ bản";
+        com.example.swp391.aistudenthub.feature.payment.service.UserPlanResolverService.UserPlanLimits limits = 
+                userPlanResolverService.resolveLimits(userId);
 
-        if (latestPaidOrder.isPresent()) {
-            int amount = latestPaidOrder.get().getAmount();
-            if (amount >= 79000) {
-                return; // PREMIUM has unlimited storage
-            } else if (amount >= 39000) {
-                limit = 500;
-                tierName = "Nâng cao";
-            }
-        }
-
-        if (currentDocsCount >= limit) {
+        if (currentDocsCount >= limits.documentLimit()) {
             throw new AppException(ErrorCode.LIMIT_EXCEEDED,
-                    String.format("Bạn đã đạt giới hạn lưu trữ tối đa của gói %s (%d tài liệu).", tierName, limit));
+                    String.format("Bạn đã đạt giới hạn lưu trữ tối đa của gói %s (%d tài liệu).", 
+                            limits.planName(), limits.documentLimit()));
         }
     }
 

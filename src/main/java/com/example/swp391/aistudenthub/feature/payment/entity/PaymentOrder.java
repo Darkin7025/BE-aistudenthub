@@ -46,6 +46,9 @@ public class PaymentOrder {
     @Column(name = "payment_link_id", length = 255)
     private String paymentLinkId;
 
+    @Column(name = "plan_id")
+    private UUID planId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 

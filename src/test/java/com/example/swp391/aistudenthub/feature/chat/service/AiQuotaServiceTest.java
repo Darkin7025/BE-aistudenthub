@@ -33,6 +33,9 @@ class AiQuotaServiceTest {
     @Mock
     private SystemConfigRepository systemConfigRepository;
 
+    @Mock
+    private com.example.swp391.aistudenthub.feature.payment.service.UserPlanResolverService userPlanResolverService;
+
     @InjectMocks
     private AiQuotaService aiQuotaService;
 
@@ -42,6 +45,9 @@ class AiQuotaServiceTest {
         when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(User.builder().id(userId).build()));
         when(systemConfigRepository.findById(AiQuotaService.DAILY_LIMIT_CONFIG_KEY)).thenReturn(Optional.empty());
         when(chatMessageRepository.countUserQuestionsSince(any(), any())).thenReturn(3L);
+        when(userPlanResolverService.resolveLimits(any())).thenReturn(
+                new com.example.swp391.aistudenthub.feature.payment.service.UserPlanResolverService.UserPlanLimits("Cơ bản", 20, 50, false)
+        );
 
         ChatQuotaResponse response = aiQuotaService.reserveQuestion(userId);
 
@@ -56,6 +62,9 @@ class AiQuotaServiceTest {
         when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(User.builder().id(userId).build()));
         when(systemConfigRepository.findById(AiQuotaService.DAILY_LIMIT_CONFIG_KEY)).thenReturn(Optional.empty());
         when(chatMessageRepository.countUserQuestionsSince(any(), any())).thenReturn(20L);
+        when(userPlanResolverService.resolveLimits(any())).thenReturn(
+                new com.example.swp391.aistudenthub.feature.payment.service.UserPlanResolverService.UserPlanLimits("Cơ bản", 20, 50, false)
+        );
 
         AppException exception = assertThrows(AppException.class, () -> aiQuotaService.reserveQuestion(userId));
 

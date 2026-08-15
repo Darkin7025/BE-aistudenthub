@@ -31,6 +31,7 @@ public class PaymentService {
 
     private final PayOS payOS;
     private final PaymentOrderRepository paymentOrderRepository;
+    private final com.example.swp391.aistudenthub.feature.payment.repository.PricingPlanRepository pricingPlanRepository;
 
     @Value("${payos.return-url:http://localhost:5173/payment/success}")
     private String defaultReturnUrl;
@@ -40,11 +41,48 @@ public class PaymentService {
 
     @Transactional
     public PaymentResponse createPaymentLink(CreatePaymentRequest request, UUID userId) {
+        Integer amount;
+        String description;
+        UUID planId = request.getPlanId();
+
+        if (planId != null) {
+            com.example.swp391.aistudenthub.feature.payment.entity.PricingPlan plan = pricingPlanRepository.findById(planId)
+                    .orElseThrow(() -> new AppException(ErrorCode.VALIDATION_ERROR, "Gói cước không tồn tại hoặc đã bị xóa."));
+            if (!plan.getActive()) {
+                throw new AppException(ErrorCode.VALIDATION_ERROR, "Gói cước này hiện không còn hoạt động.");
+            }
+            amount = plan.getPrice();
+            description = "Mua goi " + plan.getName();
+        } else {
+            amount = request.getAmount();
+            description = request.getDescription();
+            if (amount == null || amount < 2000) {
+                throw new AppException(ErrorCode.VALIDATION_ERROR, "Số tiền thanh toán tối thiểu phải là 2.000 VNĐ.");
+            }
+            if (!StringUtils.hasText(description)) {
+                throw new AppException(ErrorCode.VALIDATION_ERROR, "Nội dung thanh toán không được để trống.");
+            }
+        }
+
         paymentOrderRepository.findFirstByUserIdAndStatusOrderByCreatedAtDesc(userId, PaymentStatus.PAID)
                 .ifPresent(order -> {
-                    if (order.getPaidAt() != null && order.getPaidAt().plusMonths(1).isAfter(OffsetDateTime.now())) {
-                        if (request.getAmount() <= order.getAmount()) {
-                            throw new AppException(ErrorCode.VALIDATION_ERROR, "Bạn đang có gói cước hoạt động, không thể mua thêm gói cước tương đương hoặc thấp hơn.");
+                    OffsetDateTime paidAt = order.getPaidAt();
+                    if (paidAt != null) {
+                        int activeDurationMonths = 1;
+                        int activePrice = order.getAmount();
+
+                        if (order.getPlanId() != null) {
+                            com.example.swp391.aistudenthub.feature.payment.entity.PricingPlan activePlan = pricingPlanRepository.findById(order.getPlanId()).orElse(null);
+                            if (activePlan != null) {
+                                activeDurationMonths = activePlan.getDurationMonths();
+                                activePrice = activePlan.getPrice();
+                            }
+                        }
+
+                        if (paidAt.plusMonths(activeDurationMonths).isAfter(OffsetDateTime.now())) {
+                            if (amount <= activePrice) {
+                                throw new AppException(ErrorCode.VALIDATION_ERROR, "Bạn đang có gói cước hoạt động, không thể mua thêm gói cước tương đương hoặc thấp hơn.");
+                            }
                         }
                     }
                 });
@@ -56,21 +94,21 @@ public class PaymentService {
         String cancelUrl = StringUtils.hasText(request.getCancelUrl()) ? request.getCancelUrl()
                 : (StringUtils.hasText(defaultCancelUrl) ? defaultCancelUrl : "http://localhost:5173/payment/cancel");
 
-        String description = request.getDescription();
-        if (StringUtils.hasText(description) && description.length() > 25) {
-            description = description.substring(0, 25);
+        String payosDescription = description;
+        if (StringUtils.hasText(payosDescription) && payosDescription.length() > 25) {
+            payosDescription = payosDescription.substring(0, 25);
         }
 
         PaymentLinkItem item = PaymentLinkItem.builder()
                 .name("AI Student Hub Service")
                 .quantity(1)
-                .price((long) request.getAmount())
+                .price((long) amount)
                 .build();
 
         CreatePaymentLinkRequest paymentData = CreatePaymentLinkRequest.builder()
                 .orderCode(orderCode)
-                .amount((long) request.getAmount())
-                .description(description)
+                .amount((long) amount)
+                .description(payosDescription)
                 .returnUrl(returnUrl)
                 .cancelUrl(cancelUrl)
                 .item(item)
@@ -95,8 +133,9 @@ public class PaymentService {
         PaymentOrder paymentOrder = PaymentOrder.builder()
                 .orderCode(orderCode)
                 .userId(userId)
-                .amount(request.getAmount())
-                .description(request.getDescription())
+                .planId(planId)
+                .amount(amount)
+                .description(description)
                 .status(PaymentStatus.PENDING)
                 .checkoutUrl(checkoutUrl)
                 .qrCode(qrCode)
@@ -104,7 +143,7 @@ public class PaymentService {
                 .build();
 
         PaymentOrder saved = paymentOrderRepository.save(paymentOrder);
-        log.info("Created payment order: orderCode={}, amount={}, userId={}", orderCode, request.getAmount(), userId);
+        log.info("Created payment order: orderCode={}, amount={}, userId={}", orderCode, amount, userId);
 
         return toResponse(saved);
     }
@@ -228,6 +267,7 @@ public class PaymentService {
                 .id(order.getId())
                 .orderCode(order.getOrderCode())
                 .userId(order.getUserId())
+                .planId(order.getPlanId())
                 .amount(order.getAmount())
                 .description(order.getDescription())
                 .status(order.getStatus())

@@ -61,6 +61,7 @@ public class ChatServiceImpl implements ChatService {
     private final com.example.swp391.aistudenthub.feature.document.repository.DocumentShareRepository documentShareRepository;
     private final PaymentOrderRepository paymentOrderRepository;
     private final AiQuotaService aiQuotaService;
+    private final com.example.swp391.aistudenthub.feature.payment.service.UserPlanResolverService userPlanResolverService;
 
     @Override
     public ChatResponse chat(ChatRequest request, UUID userId) {
@@ -468,23 +469,14 @@ public class ChatServiceImpl implements ChatService {
     private DocumentChatLimitInfo resolveDocumentChatLimit(Document document, UUID userId) {
         boolean isOwner = document.getUserId().equals(userId);
         if (isOwner) {
-            Optional<PaymentOrder> latestPaidOrder = paymentOrderRepository
-                    .findFirstByUserIdAndStatusOrderByCreatedAtDesc(userId, PaymentStatus.PAID);
+            com.example.swp391.aistudenthub.feature.payment.service.UserPlanResolverService.UserPlanLimits limits = 
+                    userPlanResolverService.resolveLimits(userId);
 
             int limit = 5;
-            String tierName = "Cơ bản";
-
-            if (latestPaidOrder.isPresent()) {
-                int amount = latestPaidOrder.get().getAmount();
-                if (amount >= 79000) {
-                    limit = 15;
-                    tierName = "Chuyên gia";
-                } else if (amount >= 39000) {
-                    limit = 10;
-                    tierName = "Nâng cao";
-                }
+            if (limits.isPremium()) {
+                limit = (limits.aiDailyLimit() >= 100) ? 15 : (limits.aiDailyLimit() >= 50) ? 10 : 5;
             }
-            return new DocumentChatLimitInfo(limit, tierName, true);
+            return new DocumentChatLimitInfo(limit, limits.planName(), true);
         } else {
             return new DocumentChatLimitInfo(3, "Chia sẻ / Công khai", false);
         }
