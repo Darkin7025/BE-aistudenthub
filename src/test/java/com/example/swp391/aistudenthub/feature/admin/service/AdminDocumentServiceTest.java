@@ -39,8 +39,7 @@ class AdminDocumentServiceTest {
     @Mock
     private DocumentRepository documentRepository;
 
-    @Mock
-    private SystemLogService systemLogService;
+
 
     @Mock
     private DocumentService documentService;

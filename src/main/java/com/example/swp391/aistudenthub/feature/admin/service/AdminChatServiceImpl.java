@@ -7,7 +7,7 @@ import com.example.swp391.aistudenthub.feature.admin.dto.response.AdminChatMessa
 import com.example.swp391.aistudenthub.feature.admin.dto.response.AdminChatSessionResponse;
 import com.example.swp391.aistudenthub.feature.auth.entity.User;
 import com.example.swp391.aistudenthub.feature.auth.repository.UserRepository;
-import com.example.swp391.aistudenthub.feature.admin.service.SystemLogService;
+
 import com.example.swp391.aistudenthub.feature.chat.entity.ChatMessage;
 import com.example.swp391.aistudenthub.feature.chat.entity.ChatSession;
 import com.example.swp391.aistudenthub.feature.chat.repository.ChatMessageRepository;
@@ -34,7 +34,7 @@ public class AdminChatServiceImpl implements AdminChatService {
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final UserRepository userRepository;
-    private final SystemLogService systemLogService;
+
 
     @Override
     public PageResponse<AdminChatSessionResponse> searchChatSessions(String keyword, int page, int size) {
@@ -91,8 +91,6 @@ public class AdminChatServiceImpl implements AdminChatService {
                 .orElseThrow(() -> new AppException(ErrorCode.CHAT_SESSION_NOT_FOUND));
         chatMessageRepository.deleteBySessionId(sessionId);
         chatSessionRepository.delete(session);
-        systemLogService.audit("CHAT_SESSION_DELETED", "Session removed for moderation. Reason: " + reason.trim(),
-                "AdminChatService", adminUserId, adminEmail, "CHAT_SESSION", sessionId.toString());
         log.info("Admin {} deleted chat session {}", adminUserId, sessionId);
     }
 

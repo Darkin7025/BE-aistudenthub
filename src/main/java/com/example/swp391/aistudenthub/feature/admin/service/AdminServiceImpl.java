@@ -61,7 +61,7 @@ public class AdminServiceImpl implements AdminService {
     private final DocumentRepository documentRepository;
     private final ChatSessionRepository chatSessionRepository;
     private final SystemConfigRepository systemConfigRepository;
-    private final SystemLogService systemLogService;
+
     private final DocumentService documentService;
     private final DocumentPreviewResolver previewResolver;
     private final PaymentOrderRepository paymentOrderRepository;
@@ -278,8 +278,6 @@ public class AdminServiceImpl implements AdminService {
                 .toList();
 
         List<SystemConfig> saved = systemConfigRepository.saveAll(toSave);
-        systemLogService.audit("SYSTEM_CONFIG_UPDATED", "Updated " + saved.size() + " system configuration value(s)",
-                "AdminService", adminUserId, adminEmail, "SYSTEM_CONFIG", String.join(",", configKeys));
         log.info("Admin updated {} system config(s)", saved.size());
         return saved.stream().map(this::toConfigResponse).toList();
     }
@@ -352,10 +350,6 @@ public class AdminServiceImpl implements AdminService {
 
         doc.setDeletedAt(OffsetDateTime.now());
         documentRepository.save(doc);
-
-        systemLogService.audit("DOCUMENT_DELETED_BY_ADMIN",
-                "Deleted document: " + doc.getTitle() + " (ID: " + documentId + ")",
-                "AdminService", adminUserId, adminEmail, "DOCUMENT", documentId.toString());
 
         log.info("Admin {} soft-deleted document {}", adminEmail, documentId);
         return new MessageResponse("Tài liệu đã được xóa bởi Admin thành công");

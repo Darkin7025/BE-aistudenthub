@@ -5,8 +5,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import com.example.swp391.aistudenthub.feature.admin.entity.LogLevel;
-import com.example.swp391.aistudenthub.feature.admin.service.SystemLogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -28,7 +26,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class GlobalExceptionHandler {
 
-    private final SystemLogService systemLogService;
+
 
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ApiResponse<Void>> handleAppException(AppException ex) {
@@ -71,17 +69,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleGeneral(Exception ex, HttpServletRequest request) {
         log.error("[500] Unhandled exception: {}", ex.getMessage(), ex);
 
-        try {
-            StringWriter sw = new StringWriter();
-            ex.printStackTrace(new PrintWriter(sw));
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            User actor = authentication != null && authentication.getPrincipal() instanceof User user ? user : null;
-            systemLogService.logError(ex.getMessage(), sw.toString(), "GlobalExceptionHandler",
-                    request.getMethod(), request.getRequestURI(), 500, request.getRemoteAddr(),
-                    actor != null ? actor.getId() : null, actor != null ? actor.getEmail() : null);
-        } catch (Exception loggingEx) {
-            log.error("Failed to write to SystemLogService", loggingEx);
-        }
+
 
         return ResponseEntity
                 .internalServerError()

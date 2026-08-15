@@ -1,10 +1,7 @@
 package com.example.swp391.aistudenthub.config;
 
 import com.example.swp391.aistudenthub.feature.admin.entity.SystemConfig;
-import com.example.swp391.aistudenthub.feature.admin.entity.LogLevel;
-import com.example.swp391.aistudenthub.feature.admin.entity.SystemLog;
 import com.example.swp391.aistudenthub.feature.admin.repository.SystemConfigRepository;
-import com.example.swp391.aistudenthub.feature.admin.repository.SystemLogRepository;
 import com.example.swp391.aistudenthub.feature.auth.entity.Role;
 import com.example.swp391.aistudenthub.feature.auth.entity.User;
 import com.example.swp391.aistudenthub.feature.auth.repository.UserRepository;
@@ -33,7 +30,6 @@ public class DataSeeder implements CommandLineRunner {
     private final SystemConfigRepository systemConfigRepository;
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
-    private final SystemLogRepository systemLogRepository;
 
     @Value("${app.seed.demo-data:true}")
     private boolean demoDataEnabled;
@@ -131,40 +127,7 @@ public class DataSeeder implements CommandLineRunner {
                 new SeedMessage(MessageSender.AI, "get and put are typically O(1) on average, subject to hash distribution.")
         ));
 
-        seedSystemLog(SystemLog.builder()
-                .level(LogLevel.INFO)
-                .action("DEMO_SYSTEM_CONFIG_UPDATED")
-                .message("Demo system configuration update")
-                .source("DataSeeder")
-                .actorUserId(admin.getId())
-                .actorEmail(admin.getEmail())
-                .targetType("SYSTEM_CONFIG")
-                .targetId("feature.ai_chat.enabled")
-                .build());
-        seedSystemLog(SystemLog.builder()
-                .level(LogLevel.WARN)
-                .action("DEMO_MODERATION_REVIEW")
-                .message("A demo chat session was marked for moderation review")
-                .source("DataSeeder")
-                .actorUserId(admin.getId())
-                .actorEmail(admin.getEmail())
-                .targetType("CHAT_SESSION")
-                .targetId("demo-session")
-                .build());
-        seedSystemLog(SystemLog.builder()
-                .level(LogLevel.ERROR)
-                .action("DEMO_UNHANDLED_ERROR")
-                .message("Demo error for log filtering and detail view")
-                .stackTrace("java.lang.IllegalStateException: Demo failure\n\tat demo.DataSeeder.seedDemoData(DataSeeder.java:1)")
-                .source("DataSeeder")
-                .requestMethod("POST")
-                .requestPath("/api/v1/chat")
-                .httpStatus(500)
-                .clientIp("127.0.0.1")
-                .actorUserId(alice.getId())
-                .actorEmail(alice.getEmail())
-                .build());
-        log.info("Seeded demo data for admin chat and system log APIs.");
+        log.info("Seeded demo data for admin chat.");
     }
 
     private void seedChatSession(User user, String title, List<SeedMessage> messages) {
@@ -184,12 +147,6 @@ public class DataSeeder implements CommandLineRunner {
                 .toList();
         chatMessageRepository.saveAll(chatMessages);
         log.info("Seeded demo chat session '{}' for {}", title, user.getEmail());
-    }
-
-    private void seedSystemLog(SystemLog systemLog) {
-        if (!systemLogRepository.existsByAction(systemLog.getAction())) {
-            systemLogRepository.save(systemLog);
-        }
     }
 
     private record SeedMessage(MessageSender sender, String content) {
