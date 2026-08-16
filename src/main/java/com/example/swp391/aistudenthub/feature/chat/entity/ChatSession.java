@@ -33,6 +33,9 @@ public class ChatSession {
     @Column(name = "document_id")
     private UUID documentId;
 
+    @Column(name = "document_version_id")
+    private UUID documentVersionId;
+
     @Column(length = 500)
     private String title;
 

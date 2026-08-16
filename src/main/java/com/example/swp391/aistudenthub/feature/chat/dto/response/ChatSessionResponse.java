@@ -11,6 +11,7 @@ import java.util.UUID;
 public class ChatSessionResponse {
     private UUID id;
     private UUID documentId;
+    private UUID documentVersionId;
     private String documentTitle;
     private String title;
     private OffsetDateTime createdAt;

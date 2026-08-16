@@ -29,6 +29,7 @@ public class ChatMapper {
         return ChatSessionResponse.builder()
                 .id(session.getId())
                 .documentId(session.getDocumentId())
+                .documentVersionId(session.getDocumentVersionId())
                 .documentTitle(documentTitle)
                 .title(session.getTitle())
                 .createdAt(session.getCreatedAt())

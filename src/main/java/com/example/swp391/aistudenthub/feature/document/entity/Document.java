@@ -84,6 +84,9 @@ public class Document {
     @Column(name = "extracted_text", columnDefinition = "TEXT") // nội dung đã được trích xuất
     private String extractedText;
 
+    @Column(name = "current_version_id")
+    private UUID currentVersionId;
+
     @Column(name = "custom_metadata", columnDefinition = "TEXT") // dữ liệu metadata tuỳ chỉnh
     private String customMetadata;
 

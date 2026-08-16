@@ -52,6 +52,7 @@ public class DocumentMapper {
                 .creatorId(doc.getUserId())
                 .creatorName(creatorName)
                 .creatorEmail(creatorEmail)
+                .currentVersionId(doc.getCurrentVersionId())
                 .customMetadata(doc.getCustomMetadata())
                 .extractedText(doc.getExtractedText())
                 .approvalStatus(doc.getApprovalStatus())

@@ -16,8 +16,10 @@ import com.example.swp391.aistudenthub.feature.chat.repository.ChatMessageReposi
 import com.example.swp391.aistudenthub.feature.chat.repository.ChatSessionRepository;
 import com.example.swp391.aistudenthub.feature.admin.repository.SystemConfigRepository;
 import com.example.swp391.aistudenthub.feature.document.entity.Document;
+import com.example.swp391.aistudenthub.feature.document.entity.DocumentVersion;
 import com.example.swp391.aistudenthub.feature.document.enums.PreviewMode;
 import com.example.swp391.aistudenthub.feature.document.repository.DocumentRepository;
+import com.example.swp391.aistudenthub.feature.document.repository.DocumentVersionRepository;
 import com.example.swp391.aistudenthub.feature.document.service.DocumentPreviewResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,6 +52,7 @@ public class ChatServiceImpl implements ChatService {
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final DocumentRepository documentRepository;
+    private final DocumentVersionRepository documentVersionRepository;
     private final AIService aiService;
     private final RAGService ragService;
     private final ChatMapper chatMapper;
@@ -120,7 +123,7 @@ public class ChatServiceImpl implements ChatService {
             throw new AppException(ErrorCode.INTERNAL_ERROR);
         }
 
-        String answer = generateAnswerForDocument(document, question);
+        String answer = generateAnswerForDocument(session, document, question);
         UUID sessionId = session.getId();
 
         transactionTemplate.executeWithoutResult(status -> {
@@ -192,10 +195,11 @@ public class ChatServiceImpl implements ChatService {
             });
             return simulateStream(answer, sessionId, userId, documentId);
         }
-        if (document.getExtractedText() == null) {
+        String versionContent = resolveDocumentVersionContent(session, document);
+        if (versionContent == null) {
             throw new AppException(ErrorCode.DOCUMENT_CONTENT_NOT_AVAILABLE);
         }
-        String contextText = retrieveRelevantContext(documentId, question, document.getExtractedText());
+        String contextText = retrieveRelevantContext(documentId, question, versionContent, session.getDocumentVersionId());
         String prompt = ragService.buildDocumentPrompt(contextText, question);
         return streamAnswer(prompt, session.getId(), userId, documentId);
     }
@@ -288,6 +292,7 @@ public class ChatServiceImpl implements ChatService {
         ChatSession newSession = ChatSession.builder()
                 .userId(userId)
                 .documentId(documentId)
+                .documentVersionId(documentId != null ? resolveCurrentDocumentVersionId(documentId) : null)
                 .title(limitTitle(initialTitle))
                 .build();
         return chatSessionRepository.save(newSession);
@@ -328,11 +333,16 @@ public class ChatServiceImpl implements ChatService {
     private void attachDocumentContext(ChatSession session, UUID documentId) {
         if (session.getDocumentId() == null) {
             session.setDocumentId(documentId);
+            session.setDocumentVersionId(resolveCurrentDocumentVersionId(documentId));
             return;
         }
 
         if (!session.getDocumentId().equals(documentId)) {
             throw new AppException(ErrorCode.CHAT_SESSION_DOCUMENT_MISMATCH);
+        }
+
+        if (session.getDocumentVersionId() == null) {
+            session.setDocumentVersionId(resolveCurrentDocumentVersionId(documentId));
         }
     }
 
@@ -370,15 +380,16 @@ public class ChatServiceImpl implements ChatService {
      * Generates the AI answer for a document, routing to Vision API for images
      * and RAG prompt for text-extractable documents.
      */
-    private String generateAnswerForDocument(Document document, String question) {
+    private String generateAnswerForDocument(ChatSession session, Document document, String question) {
         PreviewMode mode = resolveDocumentMode(document);
         if (PreviewMode.IMAGE.equals(mode)) {
             return generateImageAnswerSafely(document.getFileUrl(), question);
         }
-        if (document.getExtractedText() == null) {
+        String versionContent = resolveDocumentVersionContent(session, document);
+        if (versionContent == null) {
             throw new AppException(ErrorCode.DOCUMENT_CONTENT_NOT_AVAILABLE);
         }
-        String contextText = retrieveRelevantContext(document.getId(), question, document.getExtractedText());
+        String contextText = retrieveRelevantContext(document.getId(), question, versionContent, session.getDocumentVersionId());
         String prompt = ragService.buildDocumentPrompt(contextText, question);
         return generateAnswerSafely(prompt);
     }
@@ -528,10 +539,15 @@ public class ChatServiceImpl implements ChatService {
         ChatSession session;
         if (existing.isPresent()) {
             session = existing.get();
+            if (session.getDocumentVersionId() == null) {
+                session.setDocumentVersionId(resolveCurrentDocumentVersionId(documentId));
+                session = chatSessionRepository.save(session);
+            }
         } else {
             session = ChatSession.builder()
                     .userId(userId)
                     .documentId(documentId)
+                    .documentVersionId(resolveCurrentDocumentVersionId(documentId))
                     .title("Hỏi về: " + document.getTitle())
                     .build();
             session = chatSessionRepository.save(session);
@@ -540,10 +556,19 @@ public class ChatServiceImpl implements ChatService {
         return chatMapper.toSessionResponse(session);
     }
 
-    private String retrieveRelevantContext(UUID documentId, String question, String fallbackText) {
+    private String retrieveRelevantContext(UUID documentId, String question, String fallbackText, UUID documentVersionId) {
         try {
             java.util.List<com.example.swp391.aistudenthub.feature.chat.entity.DocumentChunk> chunks = 
                     documentChunkRepository.findByDocumentIdOrderByChunkIndexAsc(documentId);
+            if (documentVersionId != null) {
+                DocumentVersion version = documentVersionRepository.findById(documentVersionId).orElse(null);
+                if (version != null && StringUtils.hasText(version.getContent())) {
+                    String versionText = version.getContent();
+                    if (versionText.length() > 0) {
+                        return retrieveRelevantTextFromChunks(versionText, question, fallbackText);
+                    }
+                }
+            }
             if (chunks == null || chunks.isEmpty()) {
                 return fallbackText;
             }
@@ -574,6 +599,46 @@ public class ChatServiceImpl implements ChatService {
             log.error("Failed to retrieve relevant context from chunks for document: {}", documentId, e);
             return fallbackText;
         }
+    }
+
+    private String retrieveRelevantTextFromChunks(String versionText, String question, String fallbackText) {
+        List<String> keywords = tokenizeForSearch(question);
+        if (keywords.isEmpty()) {
+            return versionText;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String phrase : versionText.split("\\n+")) {
+            if (phrase == null || phrase.isBlank()) {
+                continue;
+            }
+            if (keywords.stream().anyMatch(keyword -> normalizeForSearch(phrase).contains(keyword))) {
+                sb.append(phrase).append("\n");
+            }
+        }
+        if (sb.length() > 0) {
+            return sb.toString().trim();
+        }
+        return StringUtils.hasText(versionText) ? versionText : fallbackText;
+    }
+
+    private UUID resolveCurrentDocumentVersionId(UUID documentId) {
+        return documentVersionRepository.findTopByDocumentIdOrderByVersionNumberDesc(documentId)
+                .map(DocumentVersion::getId)
+                .orElse(null);
+    }
+
+    private String resolveDocumentVersionContent(ChatSession session, Document document) {
+        UUID versionId = session != null && session.getDocumentVersionId() != null
+                ? session.getDocumentVersionId()
+                : resolveCurrentDocumentVersionId(document.getId());
+
+        if (versionId == null) {
+            return document.getExtractedText();
+        }
+
+        return documentVersionRepository.findById(versionId)
+                .map(DocumentVersion::getContent)
+                .orElse(document.getExtractedText());
     }
 
     private long countMatches(String content, List<String> keywords) {

@@ -138,6 +138,31 @@ public class DocumentController {
         return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật nội dung tài liệu thành công"));
     }
 
+    @GetMapping("/{id}/versions")
+    public ResponseEntity<ApiResponse<List<com.example.swp391.aistudenthub.feature.document.dto.response.DocumentVersionResponse>>>
+    getDocumentVersions(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(ApiResponse.success(documentService.getDocumentVersions(id, currentUser.getId())));
+    }
+
+    @GetMapping("/{id}/versions/{versionId}")
+    public ResponseEntity<ApiResponse<com.example.swp391.aistudenthub.feature.document.dto.response.DocumentVersionResponse>>
+    getDocumentVersion(
+            @PathVariable UUID id,
+            @PathVariable UUID versionId,
+            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(ApiResponse.success(documentService.getDocumentVersion(id, versionId, currentUser.getId())));
+    }
+
+    @PostMapping("/{id}/versions")
+    public ResponseEntity<ApiResponse<com.example.swp391.aistudenthub.feature.document.dto.response.DocumentVersionResponse>>
+    createDocumentVersion(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(ApiResponse.success(documentService.createDocumentVersion(id, currentUser.getId()), "Tạo snapshot phiên bản thành công"));
+    }
+
     @GetMapping
     public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<DocumentResponse>>> searchAndFilterDocuments(
             @RequestParam(required = false) String keyword,

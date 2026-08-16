@@ -5,12 +5,15 @@ import com.example.swp391.aistudenthub.exception.AppException;
 import com.example.swp391.aistudenthub.exception.ErrorCode;
 import com.example.swp391.aistudenthub.feature.document.dto.request.UploadDocumentRequest;
 import com.example.swp391.aistudenthub.feature.document.dto.response.DocumentResponse;
+import com.example.swp391.aistudenthub.feature.document.dto.response.DocumentVersionResponse;
 import com.example.swp391.aistudenthub.feature.document.entity.Document;
+import com.example.swp391.aistudenthub.feature.document.entity.DocumentVersion;
 import com.example.swp391.aistudenthub.feature.document.entity.Folder;
 import com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility;
 import com.example.swp391.aistudenthub.feature.document.enums.PreviewMode;
 import com.example.swp391.aistudenthub.feature.document.mapper.DocumentMapper;
 import com.example.swp391.aistudenthub.feature.document.repository.DocumentRepository;
+import com.example.swp391.aistudenthub.feature.document.repository.DocumentVersionRepository;
 import com.example.swp391.aistudenthub.feature.document.repository.FolderRepository;
 import com.example.swp391.aistudenthub.feature.admin.repository.SystemConfigRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -57,6 +60,7 @@ public class DocumentService {
     private static final String MISSING_FILE_URL_MESSAGE = "Preview is unavailable because the file URL is missing. Please download the file.";
 
     private final DocumentRepository documentRepository;
+    private final DocumentVersionRepository documentVersionRepository;
     private final FolderRepository folderRepository;
     private final CloudinaryService cloudinaryService;
     private final DocumentMapper documentMapper;
@@ -281,6 +285,11 @@ public class DocumentService {
         validateCustomMetadata(request.getCustomMetadata());
         validateFolderOwnership(request.getFolderId(), requesterId);
 
+        String newExtractedText = request.getExtractedText();
+        if (newExtractedText != null && !newExtractedText.equals(doc.getExtractedText())) {
+            createVersionSnapshot(doc, newExtractedText, requesterId);
+        }
+
         doc.setTitle(request.getTitle().trim());
         doc.setDescription(request.getDescription());
         doc.setSubject(request.getSubject());
@@ -297,9 +306,9 @@ public class DocumentService {
             doc.setVisibility(targetVisibility);
         }
 
-        if (request.getExtractedText() != null) {
-            doc.setExtractedText(request.getExtractedText());
-            documentProcessor.reindexChunks(documentId, request.getExtractedText());
+        if (newExtractedText != null) {
+            doc.setExtractedText(newExtractedText);
+            documentProcessor.reindexChunks(documentId, newExtractedText);
         }
 
         Document saved = documentRepository.save(doc);
@@ -318,11 +327,66 @@ public class DocumentService {
             throw new AppException(ErrorCode.FORBIDDEN_ACCESS);
         }
 
-        doc.setExtractedText(request.getContent());
-        documentProcessor.reindexChunks(documentId, request.getContent());
+        String newContent = request.getContent();
+        if (newContent != null && !newContent.equals(doc.getExtractedText())) {
+            createVersionSnapshot(doc, newContent, requesterId);
+        }
+
+        doc.setExtractedText(newContent);
+        documentProcessor.reindexChunks(documentId, newContent);
         Document saved = documentRepository.save(doc);
         log.info("Document content updated: id={}, user={}", documentId, requesterId);
         return documentMapper.toResponse(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DocumentVersionResponse> getDocumentVersions(UUID documentId, UUID requesterId) {
+        Document document = documentRepository.findByIdAndDeletedAtIsNull(documentId)
+                .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
+
+        if (!document.getUserId().equals(requesterId)
+                && !com.example.swp391.aistudenthub.feature.auth.entity.Role.ADMIN.equals(userRepository.findById(requesterId).map(com.example.swp391.aistudenthub.feature.auth.entity.User::getRole).orElse(null))) {
+            boolean isShared = documentShareRepository.existsByDocumentIdAndSharedWithUserId(documentId, requesterId);
+            if (!isShared) {
+                throw new AppException(ErrorCode.FORBIDDEN_ACCESS);
+            }
+        }
+
+        return documentVersionRepository.findByDocumentIdOrderByVersionNumberDesc(documentId)
+                .stream()
+                .map(this::toVersionResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public DocumentVersionResponse getDocumentVersion(UUID documentId, UUID versionId, UUID requesterId) {
+        Document document = documentRepository.findByIdAndDeletedAtIsNull(documentId)
+                .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
+
+        if (!document.getUserId().equals(requesterId)
+                && !com.example.swp391.aistudenthub.feature.auth.entity.Role.ADMIN.equals(userRepository.findById(requesterId).map(com.example.swp391.aistudenthub.feature.auth.entity.User::getRole).orElse(null))) {
+            boolean isShared = documentShareRepository.existsByDocumentIdAndSharedWithUserId(documentId, requesterId);
+            if (!isShared) {
+                throw new AppException(ErrorCode.FORBIDDEN_ACCESS);
+            }
+        }
+
+        return documentVersionRepository.findById(versionId)
+                .filter(version -> version.getDocumentId().equals(documentId))
+                .map(this::toVersionResponse)
+                .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND, "Version not found"));
+    }
+
+    @Transactional
+    public DocumentVersionResponse createDocumentVersion(UUID documentId, UUID requesterId) {
+        Document document = documentRepository.findByIdAndDeletedAtIsNull(documentId)
+                .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
+
+        if (!document.getUserId().equals(requesterId)) {
+            throw new AppException(ErrorCode.FORBIDDEN_ACCESS);
+        }
+
+        return createVersionSnapshot(document, document.getExtractedText(), requesterId);
     }
 
     @Transactional(readOnly = true)
@@ -526,6 +590,45 @@ public class DocumentService {
         if (!folder.getUserId().equals(userId)) {
             throw new AppException(ErrorCode.FORBIDDEN_ACCESS);
         }
+    }
+
+    private DocumentVersionResponse createVersionSnapshot(Document document, String content, UUID requesterId) {
+        if (document == null) {
+            throw new AppException(ErrorCode.DOCUMENT_NOT_FOUND);
+        }
+
+        int nextVersionNumber = documentVersionRepository.findTopByDocumentIdOrderByVersionNumberDesc(document.getId())
+                .map(DocumentVersion::getVersionNumber)
+                .orElse(0) + 1;
+
+        DocumentVersion version = DocumentVersion.builder()
+                .documentId(document.getId())
+                .versionNumber(nextVersionNumber)
+                .content(content)
+                .fileUrl(document.getFileUrl())
+                .createdBy(requesterId)
+                .build();
+
+        DocumentVersion savedVersion = documentVersionRepository.save(version);
+        document.setCurrentVersionId(savedVersion.getId());
+        documentRepository.save(document);
+        return toVersionResponse(savedVersion);
+    }
+
+    private DocumentVersionResponse toVersionResponse(DocumentVersion version) {
+        if (version == null) {
+            return null;
+        }
+
+        return DocumentVersionResponse.builder()
+                .id(version.getId())
+                .documentId(version.getDocumentId())
+                .versionNumber(version.getVersionNumber())
+                .content(version.getContent())
+                .fileUrl(version.getFileUrl())
+                .createdBy(version.getCreatedBy())
+                .createdAt(version.getCreatedAt())
+                .build();
     }
 
     private boolean canPreviewDocument(
@@ -832,6 +935,10 @@ public class DocumentService {
                         newExtractedText = officeTextExtractor.extract(updatedBytes, fileName, contentType);
                     }
 
+                    if (newExtractedText != null && !newExtractedText.equals(doc.getExtractedText())) {
+                        createVersionSnapshot(doc, newExtractedText, doc.getUserId());
+                    }
+
                     if (StringUtils.hasText(newExtractedText)) {
                         doc.setExtractedText(newExtractedText);
                     }
@@ -843,6 +950,7 @@ public class DocumentService {
                     doc.setStorageResourceType(uploadResult.get("resource_type"));
                     doc.setFileSize((long) updatedBytes.length);
 
+                    documentProcessor.reindexChunks(documentId, newExtractedText != null ? newExtractedText : doc.getExtractedText());
                     documentRepository.save(doc);
                     log.info(
                             "Document {} successfully updated from OnlyOffice callback: size={} bytes, extractedText length={}",

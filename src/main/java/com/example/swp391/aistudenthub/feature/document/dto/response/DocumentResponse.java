@@ -50,6 +50,7 @@ public class DocumentResponse {
     private UUID creatorId;
     private String creatorName;
     private String creatorEmail;
+    private UUID currentVersionId;
 
     private UUID sharedByUserId;
     private String sharedByUserName;
