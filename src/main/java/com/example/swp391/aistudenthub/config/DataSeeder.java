@@ -10,6 +10,7 @@ import com.example.swp391.aistudenthub.feature.chat.entity.ChatSession;
 import com.example.swp391.aistudenthub.feature.chat.enums.MessageSender;
 import com.example.swp391.aistudenthub.feature.chat.repository.ChatMessageRepository;
 import com.example.swp391.aistudenthub.feature.chat.repository.ChatSessionRepository;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +20,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import com.example.swp391.aistudenthub.feature.document.entity.Document;
+import com.example.swp391.aistudenthub.feature.document.repository.DocumentRepository;
+import com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility;
+import com.example.swp391.aistudenthub.feature.report.entity.Report;
+import com.example.swp391.aistudenthub.feature.report.repository.ReportRepository;
+import com.example.swp391.aistudenthub.feature.report.enums.ReportReason;
+import com.example.swp391.aistudenthub.feature.report.enums.ReportStatus;
 
 @Component
 @RequiredArgsConstructor
@@ -30,6 +38,9 @@ public class DataSeeder implements CommandLineRunner {
     private final SystemConfigRepository systemConfigRepository;
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
+    private final EntityManager entityManager;
+    private final DocumentRepository documentRepository;
+    private final ReportRepository reportRepository;
 
     @Value("${app.seed.demo-data:true}")
     private boolean demoDataEnabled;
@@ -45,8 +56,18 @@ public class DataSeeder implements CommandLineRunner {
     public void run(String... args) throws Exception {
         log.info("Checking database for initial data seeding...");
         
+        try {
+            // Drop and recreate constraint to allow MODERATOR role
+            entityManager.createNativeQuery("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check").executeUpdate();
+            entityManager.createNativeQuery("ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('USER', 'ADMIN', 'GUEST', 'MODERATOR'))").executeUpdate();
+            log.info("Database constraint 'users_role_check' updated successfully.");
+        } catch (Exception e) {
+            log.warn("Could not update users_role_check constraint (might be running on a database without this constraint): {}", e.getMessage());
+        }
+
         User admin = seedUser("admin@aistudyhub.com", adminPassword, "System Admin", Role.ADMIN);
         User normalUser = seedUser("user@aistudyhub.com", userPassword, "Test User", Role.USER);
+        User moderator = seedUser("moderator@aistudyhub.com", "mod123", "Test Moderator", Role.MODERATOR);
         
         // Seed default system configs (feature flags)
         seedConfig("feature.ai_chat.enabled",   "true",  "Bật/tắt tính năng AI chat với tài liệu");
@@ -59,6 +80,7 @@ public class DataSeeder implements CommandLineRunner {
 
         if (demoDataEnabled) {
             seedDemoData(admin, normalUser);
+            seedReports(admin, normalUser);
         } else {
             log.info("Demo API data seeding is disabled. Set SEED_DEMO_DATA=true to enable it.");
         }
@@ -128,6 +150,62 @@ public class DataSeeder implements CommandLineRunner {
         ));
 
         log.info("Seeded demo data for admin chat.");
+    }
+
+    private void seedReports(User admin, User normalUser) {
+        if (reportRepository.count() > 0) {
+            return;
+        }
+
+        // 1. Seed a Document
+        Document doc1 = Document.builder()
+                .userId(normalUser.getId())
+                .title("Tài liệu lập trình Java nâng cao")
+                .description("Tài liệu hướng dẫn chi tiết các tính năng nâng cao trong Java 17.")
+                .fileName("java-nang-cao.pdf")
+                .fileUrl("https://example.com/java-nang-cao.pdf")
+                .storagePublicId("cloudinary-public-id-1")
+                .storageKey("storage-key-1")
+                .storageBucket("aistudenthub-bucket")
+                .visibility(DocumentVisibility.PUBLIC)
+                .approvalStatus(com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED)
+                .build();
+        doc1 = documentRepository.save(doc1);
+
+        Document doc2 = Document.builder()
+                .userId(normalUser.getId())
+                .title("Giáo trình cấu trúc dữ liệu và giải thuật")
+                .description("Giáo trình giảng dạy CTDL & GT trường Đại học FPT.")
+                .fileName("ctdl-gt.pdf")
+                .fileUrl("https://example.com/ctdl-gt.pdf")
+                .storagePublicId("cloudinary-public-id-2")
+                .storageKey("storage-key-2")
+                .storageBucket("aistudenthub-bucket")
+                .visibility(DocumentVisibility.PUBLIC)
+                .approvalStatus(com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED)
+                .build();
+        doc2 = documentRepository.save(doc2);
+
+        // 2. Seed Reports
+        Report report1 = Report.builder()
+                .document(doc1)
+                .reporter(normalUser)
+                .reason(ReportReason.COPYRIGHT_VIOLATION)
+                .description("Tài liệu này sao chép bản quyền sách mà không xin phép tác giả.")
+                .status(ReportStatus.PENDING)
+                .build();
+        reportRepository.save(report1);
+
+        Report report2 = Report.builder()
+                .document(doc2)
+                .reporter(normalUser)
+                .reason(ReportReason.INAPPROPRIATE_CONTENT)
+                .description("Tài liệu có chứa một số từ ngữ không phù hợp với chuẩn mực giáo dục.")
+                .status(ReportStatus.PENDING)
+                .build();
+        reportRepository.save(report2);
+
+        log.info("Seeded 2 demo reports successfully.");
     }
 
     private void seedChatSession(User user, String title, List<SeedMessage> messages) {

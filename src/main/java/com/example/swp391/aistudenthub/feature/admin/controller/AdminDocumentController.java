@@ -29,7 +29,7 @@ import com.example.swp391.aistudenthub.feature.document.enums.UploadStatus;
 @RestController
 @RequestMapping("/api/v1/admin/documents")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('ADMIN') or hasRole('MODERATOR')")
 @Tag(name = "Admin - Document Management", description = "Quản lý tài liệu toàn hệ thống (chỉ dành cho Admin)")
 public class AdminDocumentController {
 
