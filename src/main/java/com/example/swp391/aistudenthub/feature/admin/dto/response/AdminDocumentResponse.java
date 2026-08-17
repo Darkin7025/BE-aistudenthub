@@ -2,6 +2,7 @@ package com.example.swp391.aistudenthub.feature.admin.dto.response;
 
 import com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility;
 import com.example.swp391.aistudenthub.feature.document.enums.UploadStatus;
+import com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -33,6 +34,8 @@ public class AdminDocumentResponse {
     private Boolean aiSupported;
 
     private DocumentVisibility visibility;
+    private ApprovalStatus approvalStatus;
+    private String rejectionReason;
     private String subject;
     private String major;
     private String documentType;
