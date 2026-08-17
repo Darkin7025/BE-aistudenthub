@@ -14,4 +14,5 @@ import java.util.List;
 public class DocumentFilterOptionsResponse {
     private List<String> subjects;
     private List<String> majors;
+    private List<String> documentTypes;
 }

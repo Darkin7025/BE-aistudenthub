@@ -805,9 +805,13 @@ public class DocumentService {
             String keyword,
             String subject,
             String major,
+            String documentType,
+            String uploader,
+            String dateFilter,
             org.springframework.data.domain.Pageable pageable) {
         checkPublicDocumentsFeatureEnabled();
-        return documentRepository.searchAndFilterPublic(keyword, subject, major, pageable)
+        return documentRepository.searchAndFilterPublic(keyword, subject, major, documentType, uploader,
+                resolvePublicDateFilter(dateFilter), pageable)
                 .map(doc -> {
                     DocumentResponse res = documentMapper.toResponse(doc);
                     res.setExtractedText(null);
@@ -815,14 +819,29 @@ public class DocumentService {
                 });
     }
 
+    private java.time.OffsetDateTime resolvePublicDateFilter(String dateFilter) {
+        if (dateFilter == null) {
+            return null;
+        }
+        java.time.OffsetDateTime now = java.time.OffsetDateTime.now();
+        return switch (dateFilter.trim().toLowerCase(java.util.Locale.ROOT)) {
+            case "today" -> now.toLocalDate().atStartOfDay().atOffset(now.getOffset());
+            case "week" -> now.minusWeeks(1);
+            case "month" -> now.minusMonths(1);
+            default -> null;
+        };
+    }
+
     @Transactional(readOnly = true)
     public com.example.swp391.aistudenthub.feature.document.dto.response.DocumentFilterOptionsResponse getPublicFilterOptions() {
         checkPublicDocumentsFeatureEnabled();
         List<String> subjects = documentRepository.findDistinctPublicSubjects();
         List<String> majors = documentRepository.findDistinctPublicMajors();
+        List<String> documentTypes = documentRepository.findDistinctPublicDocumentTypes();
         return com.example.swp391.aistudenthub.feature.document.dto.response.DocumentFilterOptionsResponse.builder()
                 .subjects(subjects)
                 .majors(majors)
+                .documentTypes(documentTypes)
                 .build();
     }
 

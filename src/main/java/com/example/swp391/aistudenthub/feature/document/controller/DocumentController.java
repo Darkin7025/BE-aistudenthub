@@ -70,21 +70,49 @@ public class DocumentController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String subject,
             @RequestParam(required = false) String major,
+            @RequestParam(required = false) String documentType,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String uploader,
+            @RequestParam(required = false) String dateFilter,
+            @RequestParam(defaultValue = "createdAt,desc") String sort,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
-        if (keyword != null && keyword.trim().isEmpty())
-            keyword = null;
-        if (subject != null && subject.trim().isEmpty())
-            subject = null;
-        if (major != null && major.trim().isEmpty())
-            major = null;
+        keyword = normalizeBlank(keyword);
+        subject = normalizeBlank(subject);
+        major = normalizeBlank(major);
+        documentType = normalizeBlank(documentType);
+        category = normalizeBlank(category);
+        uploader = normalizeBlank(uploader);
+        dateFilter = normalizeBlank(dateFilter);
 
-        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(
-                Math.max(page, 0), Math.min(Math.max(size, 1), 50));
+        // Document has no separate category column; the legacy category filter maps to documentType.
+        if (documentType == null) {
+            documentType = category;
+        }
+
+        org.springframework.data.domain.Pageable pageable = createPublicPageable(page, size, sort);
         org.springframework.data.domain.Page<DocumentResponse> result = documentService
-                .searchPublicDocuments(keyword, subject, major, pageable);
+                .searchPublicDocuments(keyword, subject, major, documentType, uploader, dateFilter, pageable);
         return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    private String normalizeBlank(String value) {
+        return value == null || value.trim().isEmpty() ? null : value.trim();
+    }
+
+    private org.springframework.data.domain.Pageable createPublicPageable(int page, int size, String sortValue) {
+        String[] parts = sortValue == null ? new String[0] : sortValue.split(",", 2);
+        String property = parts.length > 0 ? parts[0].trim() : "createdAt";
+        if (!java.util.Set.of("createdAt", "updatedAt", "title", "fileName", "fileSize").contains(property)) {
+            property = "createdAt";
+        }
+        org.springframework.data.domain.Sort.Direction direction = parts.length == 2
+                ? org.springframework.data.domain.Sort.Direction.fromOptionalString(parts[1].trim())
+                        .orElse(org.springframework.data.domain.Sort.Direction.DESC)
+                : org.springframework.data.domain.Sort.Direction.DESC;
+        return org.springframework.data.domain.PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 50),
+                org.springframework.data.domain.Sort.by(direction, property));
     }
 
     @GetMapping("/public/filter-options")

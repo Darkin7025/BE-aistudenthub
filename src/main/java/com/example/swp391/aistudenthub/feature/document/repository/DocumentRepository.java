@@ -71,6 +71,12 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
             "AND d.approvalStatus = com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED AND d.major IS NOT NULL AND d.major != ''")
     java.util.List<String> findDistinctPublicMajors();
 
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT d.documentType FROM Document d WHERE d.deletedAt IS NULL " +
+            "AND d.visibility = com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC " +
+            "AND d.approvalStatus = com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED " +
+            "AND d.documentType IS NOT NULL AND d.documentType != '' ORDER BY d.documentType")
+    java.util.List<String> findDistinctPublicDocumentTypes();
+
     /**
      * Alias của searchPublicDocuments — tương thích với DocumentService.java trên nhánh main.
      * Tìm kiếm documents PUBLIC theo keyword, subject, major.
@@ -80,11 +86,18 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
             "AND d.approvalStatus = com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED AND " +
             "(:keyword IS NULL OR LOWER(CAST(d.title AS string)) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%')) OR LOWER(CAST(d.description AS string)) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%'))) AND " +
             "(:subject IS NULL OR d.subject = :subject) AND " +
-            "(:major IS NULL OR d.major = :major)")
+            "(:major IS NULL OR d.major = :major) AND " +
+            "(:documentType IS NULL OR d.documentType = :documentType) AND " +
+            "(:uploader IS NULL OR EXISTS (SELECT u FROM com.example.swp391.aistudenthub.feature.auth.entity.User u WHERE u.id = d.userId AND " +
+            "(LOWER(CAST(u.fullName AS string)) LIKE LOWER(CONCAT('%', CAST(:uploader AS string), '%')) OR LOWER(CAST(u.email AS string)) LIKE LOWER(CONCAT('%', CAST(:uploader AS string), '%'))))) AND " +
+            "(:createdFrom IS NULL OR d.createdAt >= :createdFrom)")
     org.springframework.data.domain.Page<Document> searchAndFilterPublic(
             @org.springframework.data.repository.query.Param("keyword") String keyword,
             @org.springframework.data.repository.query.Param("subject") String subject,
             @org.springframework.data.repository.query.Param("major") String major,
+            @org.springframework.data.repository.query.Param("documentType") String documentType,
+            @org.springframework.data.repository.query.Param("uploader") String uploader,
+            @org.springframework.data.repository.query.Param("createdFrom") java.time.OffsetDateTime createdFrom,
             org.springframework.data.domain.Pageable pageable);
 
     // ---- Admin / Dashboard queries ----
