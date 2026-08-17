@@ -1,0 +1,15 @@
+AUTO-MODERATION TEST FILE — NOT FOR DISTRIBUTION
+
+THIS DOCUMENT CONTAINS SYNTHETIC TEST DATA ONLY.
+
+Urgent promotion! Buy unrelated products now and contact us immediately for a special offer.
+This is repeated advertising spam and is not academic material.
+
+Sensitive personal information (fictional test data):
+Full name: Test User
+National ID number: 079000000001
+Bank account number: 1234567890123456
+Bank: Test Bank
+
+The content above is intentionally included to verify that the automated moderation
+system detects sensitive personal information and unrelated advertising spam.

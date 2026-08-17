@@ -1,9 +1,11 @@
 package com.example.swp391.aistudenthub.feature.document.service;
 
 import com.example.swp391.aistudenthub.feature.document.entity.Document;
+import com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility;
 import com.example.swp391.aistudenthub.feature.document.enums.PreviewMode;
 import com.example.swp391.aistudenthub.feature.document.enums.UploadStatus;
 import com.example.swp391.aistudenthub.feature.document.repository.DocumentRepository;
+import com.example.swp391.aistudenthub.feature.moderator.service.ContentScanService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;
@@ -28,6 +30,7 @@ public class DocumentProcessor {
     private final OfficeTextExtractor officeTextExtractor;
     private final com.example.swp391.aistudenthub.feature.chat.repository.DocumentChunkRepository documentChunkRepository;
     private final com.example.swp391.aistudenthub.feature.chat.service.ChunkingService chunkingService;
+    private final ContentScanService contentScanService;
 
     @Async("documentTaskExecutor")
     public void processDocumentText(UUID documentId) {
@@ -103,6 +106,11 @@ public class DocumentProcessor {
                 } catch (Exception e) {
                     log.error("Failed to chunk and save document chunks for document {}: {}", documentId, e.getMessage(), e);
                 }
+            }
+
+            // Scan only after extracted text and AI chunks have been persisted.
+            if (document.getVisibility() == DocumentVisibility.PUBLIC) {
+                contentScanService.scanAndAutoTakedownIfViolating(documentId);
             }
 
             log.info("Background text extraction completed for document: {}, status: COMPLETED", documentId);

@@ -10,6 +10,7 @@ import com.example.swp391.aistudenthub.feature.document.entity.Document;
 import com.example.swp391.aistudenthub.feature.document.entity.DocumentVersion;
 import com.example.swp391.aistudenthub.feature.document.entity.Folder;
 import com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility;
+import com.example.swp391.aistudenthub.feature.moderator.service.ContentScanService;
 import com.example.swp391.aistudenthub.feature.document.enums.PreviewMode;
 import com.example.swp391.aistudenthub.feature.document.mapper.DocumentMapper;
 import com.example.swp391.aistudenthub.feature.document.repository.DocumentRepository;
@@ -70,6 +71,7 @@ public class DocumentService {
     private final SystemConfigRepository systemConfigRepository;
     private final com.example.swp391.aistudenthub.config.OnlyOfficeConfig onlyOfficeConfig;
     private final DocumentProcessor documentProcessor;
+    private final ContentScanService contentScanService;
     private final PaymentOrderRepository paymentOrderRepository;
     private final com.example.swp391.aistudenthub.feature.auth.repository.UserRepository userRepository;
     private final com.example.swp391.aistudenthub.feature.document.repository.DocumentShareRepository documentShareRepository;
@@ -313,10 +315,13 @@ public class DocumentService {
         doc.setFolderId(request.getFolderId());
         doc.setCustomMetadata(request.getCustomMetadata());
 
+        boolean shouldScanBeforeModeration = false;
         if (request.getVisibility() != null) {
             DocumentVisibility targetVisibility = request.getVisibility();
             if (targetVisibility == DocumentVisibility.PUBLIC && doc.getVisibility() != DocumentVisibility.PUBLIC) {
-                targetVisibility = DocumentVisibility.PENDING;
+                // A publication request must pass AI scanning before moderators review it.
+                doc.setApprovalStatus(com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.PENDING);
+                shouldScanBeforeModeration = true;
             }
             doc.setVisibility(targetVisibility);
         }
@@ -327,6 +332,14 @@ public class DocumentService {
         }
 
         Document saved = documentRepository.save(doc);
+        if (shouldScanBeforeModeration) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    contentScanService.scanAndAutoTakedownIfViolating(documentId);
+                }
+            });
+        }
         return documentMapper.toResponse(saved);
     }
 
