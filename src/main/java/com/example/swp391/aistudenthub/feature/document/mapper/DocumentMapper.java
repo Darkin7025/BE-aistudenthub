@@ -38,6 +38,8 @@ public class DocumentMapper {
                 .fileUrl(doc.getFileUrl())
                 .fileName(doc.getFileName())
                 .fileSize(doc.getFileSize())
+                .viewCount(doc.getViewCount())
+                .downloadCount(doc.getDownloadCount())
                 .fileType(doc.getFileType())
                 .previewMode(previewMode.name())
                 .aiSupported(aiSupported)

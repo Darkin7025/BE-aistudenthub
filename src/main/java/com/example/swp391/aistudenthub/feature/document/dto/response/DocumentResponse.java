@@ -8,7 +8,6 @@ import lombok.NoArgsConstructor;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-
 @Data
 @Builder
 @NoArgsConstructor
@@ -19,12 +18,12 @@ public class DocumentResponse {
     private String title;
     private String description;
 
-
     private String fileUrl;
     private String fileName;
 
     private Long fileSize;
-
+    private Long viewCount;
+    private Long downloadCount;
     private String fileType;
 
     private String previewMode;
@@ -34,19 +33,19 @@ public class DocumentResponse {
     private com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility visibility;
 
     private String subject;
-    
+
     private String major;
-    
+
     private String documentType;
-    
+
     private com.example.swp391.aistudenthub.feature.document.enums.UploadStatus uploadStatus;
-    
+
     private Integer uploadProgress;
-    
+
     private UUID folderId;
 
     private OffsetDateTime createdAt;
-    
+
     private UUID creatorId;
     private String creatorName;
     private String creatorEmail;
@@ -55,7 +54,7 @@ public class DocumentResponse {
     private UUID sharedByUserId;
     private String sharedByUserName;
     private String sharedByUserEmail;
-    
+
     private String customMetadata;
     private String extractedText;
 

@@ -90,7 +90,8 @@ public class DocumentService {
 
         Map<String, String> uploadResult = cloudinaryService.upload(file);
 
-        DocumentVisibility targetVisibility = request.getVisibility() != null ? request.getVisibility() : DocumentVisibility.PUBLIC;
+        DocumentVisibility targetVisibility = request.getVisibility() != null ? request.getVisibility()
+                : DocumentVisibility.PUBLIC;
         com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus approvalStatus = com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED;
         if (targetVisibility == DocumentVisibility.PUBLIC) {
             approvalStatus = com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.PENDING;
@@ -137,12 +138,12 @@ public class DocumentService {
 
     private void checkDocumentLimit(UUID userId) {
         long currentDocsCount = documentRepository.countByUserIdAndDeletedAtIsNull(userId);
-        com.example.swp391.aistudenthub.feature.payment.service.UserPlanResolverService.UserPlanLimits limits = 
-                userPlanResolverService.resolveLimits(userId);
+        com.example.swp391.aistudenthub.feature.payment.service.UserPlanResolverService.UserPlanLimits limits = userPlanResolverService
+                .resolveLimits(userId);
 
         if (currentDocsCount >= limits.documentLimit()) {
             throw new AppException(ErrorCode.LIMIT_EXCEEDED,
-                    String.format("Bạn đã đạt giới hạn lưu trữ tối đa của gói %s (%d tài liệu).", 
+                    String.format("Bạn đã đạt giới hạn lưu trữ tối đa của gói %s (%d tài liệu).",
                             limits.planName(), limits.documentLimit()));
         }
     }
@@ -175,7 +176,8 @@ public class DocumentService {
                 .map(doc -> {
                     var share = shareMap.get(doc.getId());
                     if (share != null) {
-                        com.example.swp391.aistudenthub.feature.auth.entity.User sharer = userRepository.findByIdAndDeletedAtIsNull(share.getSharedByUserId()).orElse(null);
+                        com.example.swp391.aistudenthub.feature.auth.entity.User sharer = userRepository
+                                .findByIdAndDeletedAtIsNull(share.getSharedByUserId()).orElse(null);
                         return documentMapper.toResponse(doc, sharer);
                     }
                     return documentMapper.toResponse(doc);
@@ -183,14 +185,16 @@ public class DocumentService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public DocumentResponse getById(UUID documentId,
             com.example.swp391.aistudenthub.feature.auth.entity.User currentUser) {
         Document doc = documentRepository.findByIdAndDeletedAtIsNull(documentId)
                 .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
 
-        boolean isPublicApproved = com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC.equals(doc.getVisibility())
-                && com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED.equals(doc.getApprovalStatus());
+        boolean isPublicApproved = com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC
+                .equals(doc.getVisibility())
+                && com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED
+                        .equals(doc.getApprovalStatus());
 
         if (isPublicApproved) {
             checkPublicDocumentsFeatureEnabled();
@@ -209,6 +213,11 @@ public class DocumentService {
                 }
             }
         }
+        doc.setViewCount(
+                doc.getViewCount() + 1);
+
+        documentRepository.save(doc);
+
         DocumentResponse response = documentMapper.toResponse(doc);
         boolean isOwnerOrAdmin = currentUser != null && (doc.getUserId().equals(currentUser.getId())
                 || com.example.swp391.aistudenthub.feature.auth.entity.Role.ADMIN.equals(currentUser.getRole()));
@@ -240,14 +249,16 @@ public class DocumentService {
         return new MessageResponse("Tài liệu đã được xóa thành công");
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public String downloadDocument(UUID documentId,
             com.example.swp391.aistudenthub.feature.auth.entity.User currentUser) {
         Document doc = documentRepository.findByIdAndDeletedAtIsNull(documentId)
                 .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
 
-        boolean isPublicApproved = com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC.equals(doc.getVisibility())
-                && com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED.equals(doc.getApprovalStatus());
+        boolean isPublicApproved = com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC
+                .equals(doc.getVisibility())
+                && com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED
+                        .equals(doc.getApprovalStatus());
 
         if (isPublicApproved) {
             checkPublicDocumentsFeatureEnabled();
@@ -266,6 +277,10 @@ public class DocumentService {
                 }
             }
         }
+        doc.setDownloadCount(
+                doc.getDownloadCount() + 1);
+
+        documentRepository.save(doc);
 
         return doc.getFileUrl();
     }
@@ -345,7 +360,9 @@ public class DocumentService {
                 .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
 
         if (!document.getUserId().equals(requesterId)
-                && !com.example.swp391.aistudenthub.feature.auth.entity.Role.ADMIN.equals(userRepository.findById(requesterId).map(com.example.swp391.aistudenthub.feature.auth.entity.User::getRole).orElse(null))) {
+                && !com.example.swp391.aistudenthub.feature.auth.entity.Role.ADMIN
+                        .equals(userRepository.findById(requesterId)
+                                .map(com.example.swp391.aistudenthub.feature.auth.entity.User::getRole).orElse(null))) {
             boolean isShared = documentShareRepository.existsByDocumentIdAndSharedWithUserId(documentId, requesterId);
             if (!isShared) {
                 throw new AppException(ErrorCode.FORBIDDEN_ACCESS);
@@ -364,7 +381,9 @@ public class DocumentService {
                 .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
 
         if (!document.getUserId().equals(requesterId)
-                && !com.example.swp391.aistudenthub.feature.auth.entity.Role.ADMIN.equals(userRepository.findById(requesterId).map(com.example.swp391.aistudenthub.feature.auth.entity.User::getRole).orElse(null))) {
+                && !com.example.swp391.aistudenthub.feature.auth.entity.Role.ADMIN
+                        .equals(userRepository.findById(requesterId)
+                                .map(com.example.swp391.aistudenthub.feature.auth.entity.User::getRole).orElse(null))) {
             boolean isShared = documentShareRepository.existsByDocumentIdAndSharedWithUserId(documentId, requesterId);
             if (!isShared) {
                 throw new AppException(ErrorCode.FORBIDDEN_ACCESS);
@@ -653,8 +672,10 @@ public class DocumentService {
             return;
         }
 
-        boolean isPublicApproved = com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC.equals(doc.getVisibility())
-                && com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED.equals(doc.getApprovalStatus());
+        boolean isPublicApproved = com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC
+                .equals(doc.getVisibility())
+                && com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED
+                        .equals(doc.getApprovalStatus());
 
         if (isPublicApproved) {
             checkPublicDocumentsFeatureEnabled();
@@ -820,7 +841,8 @@ public class DocumentService {
         String documentKey = doc.getId().toString().replace("-", "") + "_" + System.currentTimeMillis();
 
         String callbackUrl = appBaseUrl + "/api/v1/documents/" + doc.getId() + "/onlyoffice-callback";
-        log.info("Generated OnlyOffice config for document {}: callbackUrl={}, appBaseUrl={}", documentId, callbackUrl, appBaseUrl);
+        log.info("Generated OnlyOffice config for document {}: callbackUrl={}, appBaseUrl={}", documentId, callbackUrl,
+                appBaseUrl);
 
         com.example.swp391.aistudenthub.feature.document.dto.response.OnlyOfficeConfigResponse.Permissions permissions = com.example.swp391.aistudenthub.feature.document.dto.response.OnlyOfficeConfigResponse.Permissions
                 .builder()
@@ -950,7 +972,8 @@ public class DocumentService {
                     doc.setStorageResourceType(uploadResult.get("resource_type"));
                     doc.setFileSize((long) updatedBytes.length);
 
-                    documentProcessor.reindexChunks(documentId, newExtractedText != null ? newExtractedText : doc.getExtractedText());
+                    documentProcessor.reindexChunks(documentId,
+                            newExtractedText != null ? newExtractedText : doc.getExtractedText());
                     documentRepository.save(doc);
                     log.info(
                             "Document {} successfully updated from OnlyOffice callback: size={} bytes, extractedText length={}",
@@ -1032,7 +1055,8 @@ public class DocumentService {
         String sharerName = userRepository.findById(currentUserId)
                 .map(com.example.swp391.aistudenthub.feature.auth.entity.User::getFullName)
                 .orElse("Someone");
-        emailService.sendDocumentSharedEmail(targetUser.getEmail(), targetUser.getFullName(), sharerName, document.getTitle(), documentViewUrl);
+        emailService.sendDocumentSharedEmail(targetUser.getEmail(), targetUser.getFullName(), sharerName,
+                document.getTitle(), documentViewUrl);
 
         return com.example.swp391.aistudenthub.feature.document.dto.response.DocumentShareResponse.builder()
                 .id(share.getId())
@@ -1057,7 +1081,8 @@ public class DocumentService {
                     if (doc == null) {
                         return null;
                     }
-                    com.example.swp391.aistudenthub.feature.auth.entity.User sharer = userRepository.findByIdAndDeletedAtIsNull(share.getSharedByUserId()).orElse(null);
+                    com.example.swp391.aistudenthub.feature.auth.entity.User sharer = userRepository
+                            .findByIdAndDeletedAtIsNull(share.getSharedByUserId()).orElse(null);
                     return documentMapper.toResponse(doc, sharer);
                 })
                 .filter(java.util.Objects::nonNull)
@@ -1082,7 +1107,8 @@ public class DocumentService {
     }
 
     @Transactional(readOnly = true)
-    public org.springframework.data.domain.Page<DocumentResponse> getPendingDocuments(org.springframework.data.domain.Pageable pageable) {
+    public org.springframework.data.domain.Page<DocumentResponse> getPendingDocuments(
+            org.springframework.data.domain.Pageable pageable) {
         return documentRepository.findPendingPublicDocuments(pageable)
                 .map(documentMapper::toResponse);
     }
@@ -1092,8 +1118,10 @@ public class DocumentService {
         Document doc = documentRepository.findByIdAndDeletedAtIsNull(documentId)
                 .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
 
-        if (!com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC.equals(doc.getVisibility())
-                || !com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.PENDING.equals(doc.getApprovalStatus())) {
+        if (!com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC
+                .equals(doc.getVisibility())
+                || !com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.PENDING
+                        .equals(doc.getApprovalStatus())) {
             throw new AppException(ErrorCode.INVALID_REQUEST, "Tài liệu này không ở trạng thái chờ duyệt công khai.");
         }
 
@@ -1111,8 +1139,10 @@ public class DocumentService {
         Document doc = documentRepository.findByIdAndDeletedAtIsNull(documentId)
                 .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
 
-        if (!com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC.equals(doc.getVisibility())
-                || !com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.PENDING.equals(doc.getApprovalStatus())) {
+        if (!com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility.PUBLIC
+                .equals(doc.getVisibility())
+                || !com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.PENDING
+                        .equals(doc.getApprovalStatus())) {
             throw new AppException(ErrorCode.INVALID_REQUEST, "Tài liệu này không ở trạng thái chờ duyệt công khai.");
         }
 

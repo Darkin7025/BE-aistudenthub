@@ -43,6 +43,14 @@ public class Document {
     @Column(name = "file_size")
     private Long fileSize;
 
+    @Column(name = "view_count", nullable = false)
+    @Builder.Default
+    private Long viewCount = 0L;
+
+    @Column(name = "download_count", nullable = false)
+    @Builder.Default
+    private Long downloadCount = 0L;
+
     @Column(name = "file_type", length = 100)
     private String fileType;
 
