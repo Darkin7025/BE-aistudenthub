@@ -396,6 +396,8 @@ public class AdminServiceImpl implements AdminService {
                 .previewMode(previewMode != null ? previewMode.name() : null)
                 .aiSupported(aiSupported)
                 .visibility(doc.getVisibility())
+                .approvalStatus(doc.getApprovalStatus())
+                .rejectionReason(doc.getRejectionReason())
                 .subject(doc.getSubject())
                 .major(doc.getMajor())
                 .documentType(doc.getDocumentType())
