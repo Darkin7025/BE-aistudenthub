@@ -29,6 +29,9 @@ class DocumentServiceContentUpdateTest {
     private DocumentRepository documentRepository;
 
     @Mock
+    private com.example.swp391.aistudenthub.feature.document.repository.DocumentVersionRepository documentVersionRepository;
+
+    @Mock
     private DocumentMapper documentMapper;
 
     @Mock
@@ -61,6 +64,12 @@ class DocumentServiceContentUpdateTest {
     void updateDocumentContent_Success_WhenOwner() {
         when(documentRepository.findByIdAndDeletedAtIsNull(docId)).thenReturn(Optional.of(document));
         when(documentRepository.save(any(Document.class))).thenAnswer(i -> i.getArgument(0));
+        when(documentVersionRepository.findTopByDocumentIdOrderByVersionNumberDesc(docId)).thenReturn(Optional.empty());
+        when(documentVersionRepository.save(any(com.example.swp391.aistudenthub.feature.document.entity.DocumentVersion.class))).thenAnswer(i -> {
+            com.example.swp391.aistudenthub.feature.document.entity.DocumentVersion dv = i.getArgument(0);
+            dv.setId(UUID.randomUUID());
+            return dv;
+        });
 
         DocumentResponse expectedResponse = DocumentResponse.builder()
                 .id(docId)

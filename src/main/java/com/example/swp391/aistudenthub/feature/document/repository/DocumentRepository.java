@@ -90,7 +90,7 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
             "(:documentType IS NULL OR d.documentType = :documentType) AND " +
             "(:uploader IS NULL OR EXISTS (SELECT u FROM com.example.swp391.aistudenthub.feature.auth.entity.User u WHERE u.id = d.userId AND " +
             "(LOWER(CAST(u.fullName AS string)) LIKE LOWER(CONCAT('%', CAST(:uploader AS string), '%')) OR LOWER(CAST(u.email AS string)) LIKE LOWER(CONCAT('%', CAST(:uploader AS string), '%'))))) AND " +
-            "(:createdFrom IS NULL OR d.createdAt >= :createdFrom)")
+            "(CAST(:createdFrom AS timestamp) IS NULL OR d.createdAt >= :createdFrom)")
     org.springframework.data.domain.Page<Document> searchAndFilterPublic(
             @org.springframework.data.repository.query.Param("keyword") String keyword,
             @org.springframework.data.repository.query.Param("subject") String subject,
