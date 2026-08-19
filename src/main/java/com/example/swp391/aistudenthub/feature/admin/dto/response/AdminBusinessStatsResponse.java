@@ -14,4 +14,5 @@ public class AdminBusinessStatsResponse {
     private long currentMonthRevenue;
     private long activePremiumUsers;
     private String mostPopularPackage;
+    private long successfulTransactions;
 }
