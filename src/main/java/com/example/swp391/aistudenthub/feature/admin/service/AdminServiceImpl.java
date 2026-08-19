@@ -203,11 +203,14 @@ public class AdminServiceImpl implements AdminService {
         List<String> popularPackages = paymentOrderRepository.findMostPopularPackages();
         String mostPopularPackage = popularPackages.isEmpty() ? "Không có dữ liệu" : popularPackages.get(0);
         
+        long successfulTransactions = paymentOrderRepository.countSuccessfulTransactions();
+        
         return AdminBusinessStatsResponse.builder()
                 .totalRevenue(totalRevenue)
                 .currentMonthRevenue(currentMonthRevenue)
                 .activePremiumUsers(activePremiumUsers)
                 .mostPopularPackage(mostPopularPackage)
+                .successfulTransactions(successfulTransactions)
                 .build();
     }
 

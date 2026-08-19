@@ -32,4 +32,7 @@ public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, UUID
     List<String> findMostPopularPackages();
 
     List<PaymentOrder> findByStatusAndPaidAtAfterOrderByPaidAtAsc(com.example.swp391.aistudenthub.feature.payment.enums.PaymentStatus status, java.time.OffsetDateTime paidAt);
+
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(p) FROM PaymentOrder p WHERE p.status = 'PAID'")
+    long countSuccessfulTransactions();
 }
