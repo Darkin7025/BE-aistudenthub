@@ -7,6 +7,7 @@ import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.util.HtmlUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -91,6 +92,58 @@ public class EmailService {
         } catch (Exception e) {
             log.error("Failed to send document shared email to {}: {}", toEmail, e.getMessage());
         }
+    }
+
+    /** Sends the document owner an explanation after automated content moderation takes it down. */
+    @Async
+    public void sendDocumentTakedownEmail(String toEmail, String recipientName, String documentTitle, String reason) {
+        if (toEmail == null || toEmail.isBlank()) {
+            return;
+        }
+
+        Map<String, Object> body = Map.of(
+                "sender", Map.of("email", fromEmail, "name", fromName),
+                "to", List.of(Map.of("email", toEmail)),
+                "subject", "[AI Study Hub] Tài liệu của bạn đã bị gỡ",
+                "htmlContent", buildDocumentTakedownEmailHtml(recipientName, documentTitle, reason)
+        );
+
+        try {
+            restClient.post()
+                    .uri("/smtp/email")
+                    .header("api-key", apiKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(body)
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("Document takedown email sent successfully to {}", toEmail);
+        } catch (Exception e) {
+            log.error("Failed to send document takedown email to {}: {}", toEmail, e.getMessage());
+        }
+    }
+
+    private String buildDocumentTakedownEmailHtml(String recipientName, String documentTitle, String reason) {
+        String safeRecipientName = HtmlUtils.htmlEscape(
+                recipientName == null || recipientName.isBlank() ? "bạn" : recipientName);
+        String safeDocumentTitle = HtmlUtils.htmlEscape(
+                documentTitle == null || documentTitle.isBlank() ? "Tài liệu" : documentTitle);
+        String safeReason = HtmlUtils.htmlEscape(
+                reason == null || reason.isBlank() ? "Nội dung không đáp ứng quy tắc cộng đồng." : reason);
+
+        return "<!DOCTYPE html><html lang=\"vi\"><head><meta charset=\"UTF-8\"></head>"
+                + "<body style=\"margin:0;padding:0;background:#f4f4f5;font-family:Arial,sans-serif;\">"
+                + "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"padding:32px 16px;\"><tr><td align=\"center\">"
+                + "<table width=\"100%\" style=\"max-width:600px;background:#fff;border-radius:10px;overflow:hidden;\">"
+                + "<tr><td style=\"background:#991b1b;padding:18px 24px;color:#fff;font-size:20px;font-weight:700;\">AI Study Hub</td></tr>"
+                + "<tr><td style=\"padding:32px 28px;color:#111827;font-size:15px;line-height:1.7;\">"
+                + "<p>Xin chào " + safeRecipientName + ",</p>"
+                + "<p>Tài liệu <strong>" + safeDocumentTitle + "</strong> đã bị gỡ tự động và không được công khai.</p>"
+                + "<p><strong>Lý do:</strong></p>"
+                + "<div style=\"padding:14px 16px;background:#fef2f2;border-left:4px solid #dc2626;border-radius:4px;\">"
+                + safeReason + "</div>"
+                + "<p>Bạn có thể chỉnh sửa tài liệu, loại bỏ nội dung vi phạm và gửi lại để xét duyệt.</p>"
+                + "<p style=\"color:#6b7280;font-size:13px;\">Đây là thông báo tự động từ AI Study Hub.</p>"
+                + "</td></tr></table></td></tr></table></body></html>";
     }
 
     private String buildSharedDocumentEmailHtml(String recipientName, String sharerName, String documentTitle, String documentUrl) {
