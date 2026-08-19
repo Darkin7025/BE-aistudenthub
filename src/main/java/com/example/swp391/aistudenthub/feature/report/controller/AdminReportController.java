@@ -24,6 +24,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import com.example.swp391.aistudenthub.feature.report.repository.ReportRepository;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -34,9 +36,28 @@ public class AdminReportController {
 
     private final ReportService reportService;
     private final DocumentRepository documentRepository;
+    private final ReportRepository reportRepository;
+
+    @GetMapping("/api/v1/admin/reports/stats")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MODERATOR')")
+    @Operation(summary = "Admin/Moderator xem thống kê báo cáo vi phạm")
+    public ResponseEntity<ApiResponse<Map<String, Long>>> getReportStats() {
+        long pending = reportRepository.countByStatus(ReportStatus.PENDING);
+        long resolved = reportRepository.countByStatus(ReportStatus.RESOLVED);
+        long dismissed = reportRepository.countByStatus(ReportStatus.DISMISSED);
+        long total = pending + resolved + dismissed;
+
+        Map<String, Long> stats = Map.of(
+            "totalReports", total,
+            "pendingReports", pending,
+            "resolvedReports", resolved,
+            "dismissedReports", dismissed
+        );
+        return ResponseEntity.ok(ApiResponse.success(stats));
+    }
 
     @PostMapping("/api/v1/documents/{id}/report")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'MODERATOR')")
     @Operation(summary = "Sinh viên gửi báo cáo vi phạm cho tài liệu")
     public ResponseEntity<ApiResponse<ReportResponse>> submitReport(
             @PathVariable UUID id,

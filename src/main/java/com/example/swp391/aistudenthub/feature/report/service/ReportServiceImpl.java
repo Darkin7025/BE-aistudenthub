@@ -36,8 +36,9 @@ public class ReportServiceImpl implements ReportService {
         Document document = documentRepository.findByIdAndDeletedAtIsNull(documentId)
                 .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
 
-        if (!DocumentVisibility.PUBLIC.equals(document.getVisibility())
-                || !com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED.equals(document.getApprovalStatus())) {
+        boolean isApproved = document.getApprovalStatus() == null 
+                || com.example.swp391.aistudenthub.feature.document.enums.ApprovalStatus.APPROVED.equals(document.getApprovalStatus());
+        if (!DocumentVisibility.PUBLIC.equals(document.getVisibility()) || !isApproved) {
             throw new AppException(ErrorCode.INVALID_REQUEST, "Chỉ có thể report tài liệu đang ở trạng thái PUBLIC và đã được phê duyệt.");
         }
 

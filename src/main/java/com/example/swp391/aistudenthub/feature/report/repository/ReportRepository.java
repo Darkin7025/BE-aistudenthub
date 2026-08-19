@@ -19,6 +19,8 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
 
     List<Report> findAllByOrderByCreatedAtDesc();
 
+    long countByStatus(ReportStatus status);
+
     @org.springframework.data.jpa.repository.Query("SELECT r FROM Report r WHERE " +
            "(:status IS NULL OR r.status = :status) AND " +
            "(:reason IS NULL OR r.reason = :reason)")
