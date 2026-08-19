@@ -25,10 +25,12 @@ import com.example.swp391.aistudenthub.feature.document.entity.Document;
 import com.example.swp391.aistudenthub.feature.payment.repository.PaymentOrderRepository;
 import com.example.swp391.aistudenthub.feature.payment.enums.PaymentStatus;
 import com.example.swp391.aistudenthub.feature.payment.entity.PaymentOrder;
+import com.example.swp391.aistudenthub.feature.payment.entity.PricingPlan;
 import com.example.swp391.aistudenthub.feature.document.enums.DocumentVisibility;
 import com.example.swp391.aistudenthub.feature.document.enums.PreviewMode;
 import com.example.swp391.aistudenthub.feature.document.service.DocumentPreviewResolver;
 import com.example.swp391.aistudenthub.feature.document.service.DocumentService;
+import com.example.swp391.aistudenthub.feature.payment.repository.PricingPlanRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -65,7 +67,7 @@ public class AdminServiceImpl implements AdminService {
     private final DocumentService documentService;
     private final DocumentPreviewResolver previewResolver;
     private final PaymentOrderRepository paymentOrderRepository;
-
+    private final PricingPlanRepository pricingPlanRepository;
     // =========================================================
     // USER MANAGEMENT
     // =========================================================
@@ -126,10 +128,10 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional(readOnly = true)
     public AdminDashboardStatsResponse getDashboardStats() {
-        long totalUsers     = userRepository.countByDeletedAtIsNull();
-        long totalDocs      = documentRepository.countByDeletedAtIsNull();
-        long totalSessions  = chatSessionRepository.count();
-        long disabledUsers  = userRepository.countByActiveAndDeletedAtIsNull(false);
+        long totalUsers = userRepository.countByDeletedAtIsNull();
+        long totalDocs = documentRepository.countByDeletedAtIsNull();
+        long totalSessions = chatSessionRepository.count();
+        long disabledUsers = userRepository.countByActiveAndDeletedAtIsNull(false);
 
         return AdminDashboardStatsResponse.builder()
                 .totalUsers(totalUsers)
@@ -145,7 +147,7 @@ public class AdminServiceImpl implements AdminService {
         return documentRepository.countByFileType().stream()
                 .map(row -> {
                     String mimeType = row[0] != null ? (String) row[0] : "unknown";
-                    long count      = ((Number) row[1]).longValue();
+                    long count = ((Number) row[1]).longValue();
                     return DocumentTypeStatResponse.builder()
                             .fileType(mimeType)
                             .label(resolveMimeLabel(mimeType))
@@ -158,7 +160,8 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional(readOnly = true)
     public List<UploadTrendResponse> getUploadTrend(int days) {
-        if (days <= 0 || days > 365) days = 30;
+        if (days <= 0 || days > 365)
+            days = 30;
         OffsetDateTime from = OffsetDateTime.now().minusDays(days);
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
@@ -173,13 +176,13 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional(readOnly = true)
     public AiUsageResponse getAiUsage() {
-        long totalDocs       = documentRepository.countByDeletedAtIsNull();
-        long docsWithAi      = documentRepository.countDocumentsWithAiUsage();
-        long docsWithout     = totalDocs - docsWithAi;
-        double percent       = totalDocs == 0 ? 0.0
+        long totalDocs = documentRepository.countByDeletedAtIsNull();
+        long docsWithAi = documentRepository.countDocumentsWithAiUsage();
+        long docsWithout = totalDocs - docsWithAi;
+        double percent = totalDocs == 0 ? 0.0
                 : BigDecimal.valueOf(docsWithAi * 100.0 / totalDocs)
-                            .setScale(2, RoundingMode.HALF_UP)
-                            .doubleValue();
+                        .setScale(2, RoundingMode.HALF_UP)
+                        .doubleValue();
 
         return AiUsageResponse.builder()
                 .totalDocuments(totalDocs)
@@ -193,18 +196,19 @@ public class AdminServiceImpl implements AdminService {
     @Transactional(readOnly = true)
     public AdminBusinessStatsResponse getBusinessStats() {
         long totalRevenue = paymentOrderRepository.calculateTotalRevenue();
-        
-        OffsetDateTime startOfMonth = OffsetDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0).withNano(0);
+
+        OffsetDateTime startOfMonth = OffsetDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0)
+                .withNano(0);
         long currentMonthRevenue = paymentOrderRepository.calculateRevenueFromDate(startOfMonth);
-        
+
         OffsetDateTime oneMonthAgo = OffsetDateTime.now().minusMonths(1);
         long activePremiumUsers = paymentOrderRepository.countActivePremiumUsers(oneMonthAgo);
-        
+
         List<String> popularPackages = paymentOrderRepository.findMostPopularPackages();
         String mostPopularPackage = popularPackages.isEmpty() ? "Không có dữ liệu" : popularPackages.get(0);
-        
+
         long successfulTransactions = paymentOrderRepository.countSuccessfulTransactions();
-        
+
         return AdminBusinessStatsResponse.builder()
                 .totalRevenue(totalRevenue)
                 .currentMonthRevenue(currentMonthRevenue)
@@ -217,12 +221,14 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional(readOnly = true)
     public List<RevenueTrendResponse> getRevenueTrend(int days) {
-        if (days <= 0 || days > 365) days = 30;
+        if (days <= 0 || days > 365)
+            days = 30;
         OffsetDateTime from = OffsetDateTime.now().minusDays(days).withHour(0).withMinute(0).withSecond(0).withNano(0);
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-        List<PaymentOrder> orders = paymentOrderRepository.findByStatusAndPaidAtAfterOrderByPaidAtAsc(PaymentStatus.PAID, from);
-        
+        List<PaymentOrder> orders = paymentOrderRepository
+                .findByStatusAndPaidAtAfterOrderByPaidAtAsc(PaymentStatus.PAID, from);
+
         // Group by date
         Map<String, Long> revenueByDate = new HashMap<>();
         for (PaymentOrder order : orders) {
@@ -231,7 +237,7 @@ public class AdminServiceImpl implements AdminService {
                 revenueByDate.put(dateStr, revenueByDate.getOrDefault(dateStr, 0L) + order.getAmount());
             }
         }
-        
+
         // Fill missing days with 0
         return java.util.stream.IntStream.rangeClosed(0, days)
                 .mapToObj(i -> from.plusDays(i).format(fmt))
@@ -257,34 +263,112 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional
-    public List<SystemConfigResponse> updateConfigs(UpdateSystemConfigRequest request, UUID adminUserId, String adminEmail) {
+    public List<SystemConfigResponse> updateConfigs(
+            UpdateSystemConfigRequest request,
+            UUID adminUserId,
+            String adminEmail) {
+
         Set<String> configKeys = new HashSet<>();
+
+        // 1. Validate config
         for (UpdateSystemConfigRequest.ConfigEntry entry : request.getConfigs()) {
+
             String key = entry.getConfigKey().trim();
+
             if (!configKeys.add(key)) {
-                throw new AppException(ErrorCode.VALIDATION_ERROR, "Config key bị trùng: " + key);
+                throw new AppException(
+                        ErrorCode.VALIDATION_ERROR,
+                        "Config key bị trùng: " + key);
             }
+
             entry.setConfigKey(key);
             entry.setConfigValue(entry.getConfigValue().trim());
+
             validateConfigValue(entry);
         }
 
-        List<SystemConfig> toSave = request.getConfigs().stream()
+        // 2. Save SystemConfig
+        List<SystemConfig> toSave = request.getConfigs()
+                .stream()
                 .map(entry -> {
-                    SystemConfig config = systemConfigRepository.findById(entry.getConfigKey())
-                            .orElse(SystemConfig.builder()
-                                    .configKey(entry.getConfigKey())
-                                    .build());
+
+                    SystemConfig config = systemConfigRepository
+                            .findById(entry.getConfigKey())
+                            .orElse(
+                                    SystemConfig.builder()
+                                            .configKey(entry.getConfigKey())
+                                            .build());
+
                     config.setConfigValue(entry.getConfigValue());
+
                     return config;
                 })
                 .toList();
 
         List<SystemConfig> saved = systemConfigRepository.saveAll(toSave);
-        log.info("Admin updated {} system config(s)", saved.size());
-        return saved.stream().map(this::toConfigResponse).toList();
+
+        // 3. Đồng bộ giá PRO/PREMIUM sang PricingPlan
+        for (UpdateSystemConfigRequest.ConfigEntry entry : request.getConfigs()) {
+
+            if ("package.pro.price".equals(entry.getConfigKey())) {
+
+                updatePricingPlanPrice(
+                        "STUDENT",
+                        entry.getConfigValue());
+
+            } else if ("package.premium.price".equals(entry.getConfigKey())) {
+
+                updatePricingPlanPrice(
+                        "PRO",
+                        entry.getConfigValue());
+            }
+        }
+
+        log.info(
+                "Admin {} updated {} system config(s)",
+                adminEmail,
+                saved.size());
+
+        return saved.stream()
+                .map(this::toConfigResponse)
+                .toList();
     }
 
+    private void updatePricingPlanPrice(
+            String planName,
+            String value) {
+
+        Integer price;
+
+        try {
+            price = Integer.valueOf(value);
+        } catch (NumberFormatException e) {
+            throw new AppException(
+                    ErrorCode.VALIDATION_ERROR,
+                    "Giá gói " + planName + " không hợp lệ.");
+        }
+
+        if (price < 1000) {
+            throw new AppException(
+                    ErrorCode.VALIDATION_ERROR,
+                    "Giá gói " + planName + " phải tối thiểu 1.000đ.");
+        }
+
+        PricingPlan plan = pricingPlanRepository
+                .findByNameIgnoreCase(planName)
+                .orElseThrow(() -> new AppException(
+                        ErrorCode.DOCUMENT_NOT_FOUND,
+                        "Không tìm thấy gói " + planName));
+
+        plan.setPrice(price);
+
+        pricingPlanRepository.save(plan);
+
+        log.info(
+                "Updated PricingPlan {} price = {}",
+                planName,
+                price);
+    }
     // =========================================================
     // DOCUMENT MANAGEMENT
     // =========================================================
@@ -301,19 +385,26 @@ public class AdminServiceImpl implements AdminService {
             DocumentVisibility visibility,
             Boolean includeDeleted,
             Pageable pageable) {
-        if (keyword != null && keyword.trim().isEmpty()) keyword = null;
-        if (subject != null && subject.trim().isEmpty()) subject = null;
-        if (major != null && major.trim().isEmpty()) major = null;
-        if (documentType != null && documentType.trim().isEmpty()) documentType = null;
-        if (includeDeleted == null) includeDeleted = false;
+        if (keyword != null && keyword.trim().isEmpty())
+            keyword = null;
+        if (subject != null && subject.trim().isEmpty())
+            subject = null;
+        if (major != null && major.trim().isEmpty())
+            major = null;
+        if (documentType != null && documentType.trim().isEmpty())
+            documentType = null;
+        if (includeDeleted == null)
+            includeDeleted = false;
 
-        // Nếu Pageable chưa có sắp xếp, mặc định sắp xếp theo createdAt DESC (mới nhất lên đầu)
+        // Nếu Pageable chưa có sắp xếp, mặc định sắp xếp theo createdAt DESC (mới nhất
+        // lên đầu)
         if (pageable.getSort().isUnsorted()) {
-            pageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "createdAt"));
+            pageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+                    Sort.by(Sort.Direction.DESC, "createdAt"));
         }
 
         Page<Document> documents = documentRepository.searchAllDocumentsAdmin(
-                        userId, keyword, subject, major, documentType, uploadStatus, visibility, includeDeleted, pageable);
+                userId, keyword, subject, major, documentType, uploadStatus, visibility, includeDeleted, pageable);
 
         List<UUID> userIds = documents.getContent().stream()
                 .map(Document::getUserId)
@@ -371,7 +462,8 @@ public class AdminServiceImpl implements AdminService {
     }
 
     private AdminDocumentResponse toAdminDocumentResponse(Document doc, User user) {
-        if (doc == null) return null;
+        if (doc == null)
+            return null;
 
         String uploaderEmail = null;
         String uploaderFullName = null;
@@ -416,19 +508,23 @@ public class AdminServiceImpl implements AdminService {
 
     /** Chuyển MIME type sang nhãn thân thiện để hiển thị trên dashboard. */
     private String resolveMimeLabel(String mimeType) {
-        if (mimeType == null) return "Unknown";
+        if (mimeType == null)
+            return "Unknown";
         return switch (mimeType.toLowerCase()) {
-            case "application/pdf"                                                          -> "PDF";
+            case "application/pdf" -> "PDF";
             case "application/msword",
-                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> "Word";
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ->
+                "Word";
             case "application/vnd.ms-excel",
-                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"       -> "Excel";
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ->
+                "Excel";
             case "application/vnd.ms-powerpoint",
-                 "application/vnd.openxmlformats-officedocument.presentationml.presentation" -> "PowerPoint";
-            case "text/plain"                                                               -> "Text";
-            case "image/jpeg", "image/jpg"                                                 -> "JPEG";
-            case "image/png"                                                               -> "PNG";
-            case "image/gif"                                                               -> "GIF";
+                    "application/vnd.openxmlformats-officedocument.presentationml.presentation" ->
+                "PowerPoint";
+            case "text/plain" -> "Text";
+            case "image/jpeg", "image/jpg" -> "JPEG";
+            case "image/png" -> "PNG";
+            case "image/gif" -> "GIF";
             default -> mimeType.contains("/") ? mimeType.split("/")[1].toUpperCase() : mimeType;
         };
     }
