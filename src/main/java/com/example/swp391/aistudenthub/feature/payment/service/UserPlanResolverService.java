@@ -24,25 +24,45 @@ public class UserPlanResolverService {
             int aiDailyLimit,
             int documentLimit,
             boolean isPremium
-    ) {}
+    ) {
+    }
 
     public UserPlanLimits resolveLimits(UUID userId) {
-        Optional<PaymentOrder> latestPaidOrder = paymentOrderRepository
-                .findFirstByUserIdAndStatusOrderByCreatedAtDesc(userId, PaymentStatus.PAID);
+
+        Optional<PaymentOrder> latestPaidOrder =
+                paymentOrderRepository
+                        .findFirstByUserIdAndStatusOrderByCreatedAtDesc(
+                                userId,
+                                PaymentStatus.PAID
+                        );
 
         if (latestPaidOrder.isEmpty()) {
-            return new UserPlanLimits("Cơ bản", 20, 50, false); // Default limits
+            return defaultPlan();
         }
 
         PaymentOrder order = latestPaidOrder.get();
         OffsetDateTime paidAt = order.getPaidAt();
 
+        if (paidAt == null) {
+            return defaultPlan();
+        }
+
+        /*
+         * Order mới có planId
+         */
         if (order.getPlanId() != null) {
-            Optional<PricingPlan> planOpt = pricingPlanRepository.findById(order.getPlanId());
+
+            Optional<PricingPlan> planOpt =
+                    pricingPlanRepository.findById(order.getPlanId());
+
             if (planOpt.isPresent()) {
+
                 PricingPlan plan = planOpt.get();
-                int durationMonths = plan.getDurationMonths();
-                if (paidAt != null && paidAt.plusMonths(durationMonths).isAfter(OffsetDateTime.now())) {
+
+                if (paidAt
+                        .plusMonths(plan.getDurationMonths())
+                        .isAfter(OffsetDateTime.now())) {
+
                     return new UserPlanLimits(
                             plan.getName(),
                             plan.getAiDailyLimit(),
@@ -53,16 +73,50 @@ public class UserPlanResolverService {
             }
         }
 
-        // Backward compatibility for orders without planId
-        if (paidAt != null && paidAt.plusMonths(1).isAfter(OffsetDateTime.now())) {
-            int amount = order.getAmount();
-            if (amount >= 79000) {
-                return new UserPlanLimits("Chuyên gia", 100, Integer.MAX_VALUE, true);
-            } else if (amount >= 39000) {
-                return new UserPlanLimits("Nâng cao", 50, 500, true);
+        /*
+         * Order cũ không có planId
+         */
+        if (paidAt.plusMonths(1).isAfter(OffsetDateTime.now())) {
+
+            Integer amount = order.getAmount();
+
+            /*
+             * Tìm gói theo giá hiện tại trong DB.
+             * Không hard-code 39.000 / 79.000.
+             */
+            Optional<PricingPlan> planOpt =
+                    pricingPlanRepository.findByPrice(amount);
+
+            if (planOpt.isPresent()) {
+
+                PricingPlan plan = planOpt.get();
+
+                String displayName;
+
+                if ("PRO".equalsIgnoreCase(plan.getName())) {
+                    displayName = "Chuyên gia";
+                } else {
+                    displayName = "Nâng cao";
+                }
+
+                return new UserPlanLimits(
+                        displayName,
+                        plan.getAiDailyLimit(),
+                        plan.getDocumentLimit(),
+                        true
+                );
             }
         }
 
-        return new UserPlanLimits("Cơ bản", 20, 50, false);
+        return defaultPlan();
+    }
+
+    private UserPlanLimits defaultPlan() {
+        return new UserPlanLimits(
+                "Cơ bản",
+                20,
+                50,
+                false
+        );
     }
 }

@@ -14,4 +14,6 @@ public interface PricingPlanRepository extends JpaRepository<PricingPlan, UUID> 
     List<PricingPlan> findByActiveTrue();
 
     Optional<PricingPlan> findByNameIgnoreCase(String planName);
+
+    Optional<PricingPlan> findByPrice(Integer amount);
 }
