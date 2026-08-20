@@ -120,10 +120,14 @@ public class UserProfileService {
 
             if (order.getPaidAt() != null) {
 
-                OffsetDateTime expireAt = null;
+                /*
+                 * Mặc định đơn cũ không có planId:
+                 * thời hạn 1 tháng
+                 */
+                OffsetDateTime expireAt = order.getPaidAt().plusMonths(1);
 
                 /*
-                 * Đơn mới: có planId
+                 * Đơn mới có planId
                  */
                 if (order.getPlanId() != null) {
 
@@ -142,8 +146,8 @@ public class UserProfileService {
                             premiumExpireAt = expireAt;
 
                             /*
-                             * STUDENT = Gói Nâng cao = PRO frontend
-                             * PRO = Gói Chuyên gia = PREMIUM frontend
+                             * STUDENT = Gói Nâng cao
+                             * PRO = Gói Chuyên gia
                              */
                             if ("STUDENT".equalsIgnoreCase(plan.getName())) {
                                 subscriptionTier = "PRO";
@@ -156,25 +160,36 @@ public class UserProfileService {
                 }
 
                 /*
-                 * Đơn cũ: chưa có planId
-                 * Giữ tương thích với dữ liệu cũ
+                 * Đơn cũ không có planId
+                 * Xác định gói từ description
                  */
                 else {
-
-                    expireAt = order.getPaidAt().plusMonths(1);
 
                     if (expireAt.isAfter(OffsetDateTime.now())) {
 
                         isPremium = true;
                         premiumExpireAt = expireAt;
 
-                        int amount = order.getAmount();
+                        String description = order.getDescription();
 
-                        if (amount >= 79000) {
-                            subscriptionTier = "PREMIUM";
+                        if (description != null) {
 
-                        } else if (amount >= 39000) {
-                            subscriptionTier = "PRO";
+                            String normalizedDescription = description.toLowerCase();
+
+                            /*
+                             * "Mua goi PRO"
+                             */
+                            if (normalizedDescription.contains("pro")) {
+
+                                subscriptionTier = "PREMIUM";
+
+                                /*
+                                 * "Mua goi STUDENT"
+                                 */
+                            } else if (normalizedDescription.contains("student")) {
+
+                                subscriptionTier = "PRO";
+                            }
                         }
                     }
                 }
