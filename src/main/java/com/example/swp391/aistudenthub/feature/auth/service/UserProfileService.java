@@ -118,46 +118,62 @@ public class UserProfileService {
 
             PaymentOrder order = latestPaidOrder.get();
 
-            if (order.getPaidAt() != null &&
-                    order.getPlanId() != null) {
+            if (order.getPaidAt() != null) {
 
-                Optional<PricingPlan> planOptional = pricingPlanRepository.findById(
-                        order.getPlanId());
+                OffsetDateTime expireAt = null;
 
-                if (planOptional.isPresent()) {
+                /*
+                 * Đơn mới: có planId
+                 */
+                if (order.getPlanId() != null) {
 
-                    PricingPlan plan = planOptional.get();
+                    Optional<PricingPlan> planOptional = pricingPlanRepository.findById(order.getPlanId());
 
-                    /*
-                     * Thời hạn theo PricingPlan
-                     */
-                    OffsetDateTime expireAt = order.getPaidAt()
-                            .plusMonths(
-                                    plan.getDurationMonths());
+                    if (planOptional.isPresent()) {
 
-                    /*
-                     * Gói vẫn còn hạn
-                     */
+                        PricingPlan plan = planOptional.get();
+
+                        expireAt = order.getPaidAt()
+                                .plusMonths(plan.getDurationMonths());
+
+                        if (expireAt.isAfter(OffsetDateTime.now())) {
+
+                            isPremium = true;
+                            premiumExpireAt = expireAt;
+
+                            /*
+                             * STUDENT = Gói Nâng cao = PRO frontend
+                             * PRO = Gói Chuyên gia = PREMIUM frontend
+                             */
+                            if ("STUDENT".equalsIgnoreCase(plan.getName())) {
+                                subscriptionTier = "PRO";
+
+                            } else if ("PRO".equalsIgnoreCase(plan.getName())) {
+                                subscriptionTier = "PREMIUM";
+                            }
+                        }
+                    }
+                }
+
+                /*
+                 * Đơn cũ: chưa có planId
+                 * Giữ tương thích với dữ liệu cũ
+                 */
+                else {
+
+                    expireAt = order.getPaidAt().plusMonths(1);
+
                     if (expireAt.isAfter(OffsetDateTime.now())) {
 
                         isPremium = true;
-
                         premiumExpireAt = expireAt;
 
-                        /*
-                         * Xác định tier theo NAME
-                         *
-                         * STUDENT = PRO frontend
-                         * PRO = PREMIUM frontend
-                         */
-                        if ("PRO".equalsIgnoreCase(
-                                plan.getName())) {
+                        int amount = order.getAmount();
 
+                        if (amount >= 79000) {
                             subscriptionTier = "PREMIUM";
 
-                        } else if ("STUDENT".equalsIgnoreCase(
-                                plan.getName())) {
-
+                        } else if (amount >= 39000) {
                             subscriptionTier = "PRO";
                         }
                     }
