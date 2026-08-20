@@ -9,6 +9,7 @@ import com.example.swp391.aistudenthub.feature.auth.dto.UserProfileResponse;
 import com.example.swp391.aistudenthub.feature.auth.entity.User;
 import com.example.swp391.aistudenthub.feature.auth.repository.UserRepository;
 import com.example.swp391.aistudenthub.feature.payment.repository.PaymentOrderRepository;
+import com.example.swp391.aistudenthub.feature.payment.repository.PricingPlanRepository;
 import com.example.swp391.aistudenthub.feature.payment.enums.PaymentStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -16,11 +17,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.OffsetDateTime;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.Optional;
 import com.example.swp391.aistudenthub.feature.payment.entity.PaymentOrder;
+import com.example.swp391.aistudenthub.feature.payment.entity.PricingPlan;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +32,7 @@ public class UserProfileService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final PaymentOrderRepository paymentOrderRepository;
+    private final PricingPlanRepository pricingPlanRepository;
 
     @Transactional(readOnly = true)
     public UserProfileResponse getProfile(UUID userId) {
@@ -100,23 +104,62 @@ public class UserProfileService {
     }
 
     private UserProfileResponse mapToResponse(User user) {
-        Optional<PaymentOrder> latestPaidOrder = paymentOrderRepository.findFirstByUserIdAndStatusOrderByCreatedAtDesc(user.getId(), PaymentStatus.PAID);
+
+        Optional<PaymentOrder> latestPaidOrder = paymentOrderRepository
+                .findFirstByUserIdAndStatusOrderByCreatedAtDesc(
+                        user.getId(),
+                        PaymentStatus.PAID);
+
         boolean isPremium = false;
         String subscriptionTier = "BASIC";
-        java.time.OffsetDateTime premiumExpireAt = null;
-        
+        OffsetDateTime premiumExpireAt = null;
+
         if (latestPaidOrder.isPresent()) {
+
             PaymentOrder order = latestPaidOrder.get();
-            if (order.getPaidAt() != null) {
-                java.time.OffsetDateTime calculatedExpireAt = order.getPaidAt().plusMonths(1);
-                if (calculatedExpireAt.isAfter(java.time.OffsetDateTime.now())) {
-                    isPremium = true;
-                    premiumExpireAt = calculatedExpireAt;
-                    int amount = order.getAmount();
-                    if (amount >= 79000) {
-                        subscriptionTier = "PREMIUM";
-                    } else if (amount >= 39000) {
-                        subscriptionTier = "PRO";
+
+            if (order.getPaidAt() != null &&
+                    order.getPlanId() != null) {
+
+                Optional<PricingPlan> planOptional = pricingPlanRepository.findById(
+                        order.getPlanId());
+
+                if (planOptional.isPresent()) {
+
+                    PricingPlan plan = planOptional.get();
+
+                    /*
+                     * Thời hạn theo PricingPlan
+                     */
+                    OffsetDateTime expireAt = order.getPaidAt()
+                            .plusMonths(
+                                    plan.getDurationMonths());
+
+                    /*
+                     * Gói vẫn còn hạn
+                     */
+                    if (expireAt.isAfter(OffsetDateTime.now())) {
+
+                        isPremium = true;
+
+                        premiumExpireAt = expireAt;
+
+                        /*
+                         * Xác định tier theo NAME
+                         *
+                         * STUDENT = PRO frontend
+                         * PRO = PREMIUM frontend
+                         */
+                        if ("PRO".equalsIgnoreCase(
+                                plan.getName())) {
+
+                            subscriptionTier = "PREMIUM";
+
+                        } else if ("STUDENT".equalsIgnoreCase(
+                                plan.getName())) {
+
+                            subscriptionTier = "PRO";
+                        }
                     }
                 }
             }
