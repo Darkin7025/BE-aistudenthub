@@ -48,6 +48,7 @@ import java.util.HashSet;
 import java.util.UUID;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.HashMap;
 import java.util.stream.Collectors;
 import com.example.swp391.aistudenthub.feature.document.enums.UploadStatus;
@@ -530,6 +531,98 @@ public class AdminServiceImpl implements AdminService {
     }
 
     private AdminUserResponse toAdminUserResponse(User user) {
+
+        Optional<PaymentOrder> latestPaidOrder = paymentOrderRepository
+                .findFirstByUserIdAndStatusOrderByCreatedAtDesc(
+                        user.getId(),
+                        PaymentStatus.PAID);
+
+        boolean isPremium = false;
+        String subscriptionTier = "BASIC";
+        OffsetDateTime premiumExpireAt = null;
+
+        if (latestPaidOrder.isPresent()) {
+
+            PaymentOrder order = latestPaidOrder.get();
+
+            if (order.getPaidAt() != null) {
+
+                /*
+                 * Mặc định đơn cũ không có planId:
+                 * thời hạn 1 tháng
+                 */
+                OffsetDateTime expireAt = order.getPaidAt().plusMonths(1);
+
+                /*
+                 * Đơn mới có planId
+                 */
+                if (order.getPlanId() != null) {
+
+                    Optional<PricingPlan> planOptional = pricingPlanRepository.findById(order.getPlanId());
+
+                    if (planOptional.isPresent()) {
+
+                        PricingPlan plan = planOptional.get();
+
+                        expireAt = order.getPaidAt()
+                                .plusMonths(plan.getDurationMonths());
+
+                        if (expireAt.isAfter(OffsetDateTime.now())) {
+
+                            isPremium = true;
+                            premiumExpireAt = expireAt;
+
+                            /*
+                             * STUDENT = Gói Nâng cao
+                             * PRO = Gói Chuyên gia
+                             */
+                            if ("STUDENT".equalsIgnoreCase(plan.getName())) {
+                                subscriptionTier = "PRO";
+
+                            } else if ("PRO".equalsIgnoreCase(plan.getName())) {
+                                subscriptionTier = "PREMIUM";
+                            }
+                        }
+                    }
+                }
+
+                /*
+                 * Đơn cũ không có planId
+                 * Xác định gói từ description
+                 */
+                else {
+
+                    if (expireAt.isAfter(OffsetDateTime.now())) {
+
+                        isPremium = true;
+                        premiumExpireAt = expireAt;
+
+                        String description = order.getDescription();
+
+                        if (description != null) {
+
+                            String normalizedDescription = description.toLowerCase();
+
+                            /*
+                             * Mua goi PRO
+                             */
+                            if (normalizedDescription.contains("pro")) {
+
+                                subscriptionTier = "PREMIUM";
+
+                                /*
+                                 * Mua goi STUDENT
+                                 */
+                            } else if (normalizedDescription.contains("student")) {
+
+                                subscriptionTier = "PRO";
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         return AdminUserResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
@@ -541,6 +634,9 @@ public class AdminServiceImpl implements AdminService {
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .deletedAt(user.getDeletedAt())
+                .isPremium(isPremium)
+                .subscriptionTier(subscriptionTier)
+                .premiumExpireAt(premiumExpireAt)
                 .build();
     }
 

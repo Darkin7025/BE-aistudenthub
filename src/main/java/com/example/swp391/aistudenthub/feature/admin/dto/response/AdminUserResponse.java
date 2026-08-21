@@ -27,4 +27,7 @@ public class AdminUserResponse {
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
     private OffsetDateTime deletedAt;
+    private Boolean isPremium;
+    private String subscriptionTier;
+    private OffsetDateTime premiumExpireAt;
 }
