@@ -86,7 +86,8 @@ public class DocumentController {
         uploader = normalizeBlank(uploader);
         dateFilter = normalizeBlank(dateFilter);
 
-        // Document has no separate category column; the legacy category filter maps to documentType.
+        // Document has no separate category column; the legacy category filter maps to
+        // documentType.
         if (documentType == null) {
             documentType = category;
         }
@@ -167,28 +168,27 @@ public class DocumentController {
     }
 
     @GetMapping("/{id}/versions")
-    public ResponseEntity<ApiResponse<List<com.example.swp391.aistudenthub.feature.document.dto.response.DocumentVersionResponse>>>
-    getDocumentVersions(
+    public ResponseEntity<ApiResponse<List<com.example.swp391.aistudenthub.feature.document.dto.response.DocumentVersionResponse>>> getDocumentVersions(
             @PathVariable UUID id,
             @AuthenticationPrincipal User currentUser) {
         return ResponseEntity.ok(ApiResponse.success(documentService.getDocumentVersions(id, currentUser.getId())));
     }
 
     @GetMapping("/{id}/versions/{versionId}")
-    public ResponseEntity<ApiResponse<com.example.swp391.aistudenthub.feature.document.dto.response.DocumentVersionResponse>>
-    getDocumentVersion(
+    public ResponseEntity<ApiResponse<com.example.swp391.aistudenthub.feature.document.dto.response.DocumentVersionResponse>> getDocumentVersion(
             @PathVariable UUID id,
             @PathVariable UUID versionId,
             @AuthenticationPrincipal User currentUser) {
-        return ResponseEntity.ok(ApiResponse.success(documentService.getDocumentVersion(id, versionId, currentUser.getId())));
+        return ResponseEntity
+                .ok(ApiResponse.success(documentService.getDocumentVersion(id, versionId, currentUser.getId())));
     }
 
     @PostMapping("/{id}/versions")
-    public ResponseEntity<ApiResponse<com.example.swp391.aistudenthub.feature.document.dto.response.DocumentVersionResponse>>
-    createDocumentVersion(
+    public ResponseEntity<ApiResponse<com.example.swp391.aistudenthub.feature.document.dto.response.DocumentVersionResponse>> createDocumentVersion(
             @PathVariable UUID id,
             @AuthenticationPrincipal User currentUser) {
-        return ResponseEntity.ok(ApiResponse.success(documentService.createDocumentVersion(id, currentUser.getId()), "Tạo snapshot phiên bản thành công"));
+        return ResponseEntity.ok(ApiResponse.success(documentService.createDocumentVersion(id, currentUser.getId()),
+                "Tạo snapshot phiên bản thành công"));
     }
 
     @GetMapping
@@ -257,13 +257,16 @@ public class DocumentController {
         return ResponseEntity.ok(ApiResponse.success(config));
     }
 
-    @RequestMapping(value = "/{id}/onlyoffice-callback", method = {org.springframework.web.bind.annotation.RequestMethod.POST, org.springframework.web.bind.annotation.RequestMethod.GET})
+    @RequestMapping(value = "/{id}/onlyoffice-callback", method = {
+            org.springframework.web.bind.annotation.RequestMethod.POST,
+            org.springframework.web.bind.annotation.RequestMethod.GET })
     public ResponseEntity<java.util.Map<String, Object>> handleOnlyOfficeCallback(
             @PathVariable UUID id,
             @RequestBody(required = false) com.example.swp391.aistudenthub.feature.document.dto.request.OnlyOfficeCallbackRequest callback,
             jakarta.servlet.http.HttpServletRequest httpRequest) {
 
-        if (onlyOfficeConfig.isEnabled() && org.springframework.util.StringUtils.hasText(onlyOfficeConfig.getDocserviceSecret())) {
+        if (onlyOfficeConfig.isEnabled()
+                && org.springframework.util.StringUtils.hasText(onlyOfficeConfig.getDocserviceSecret())) {
             String token = null;
             String headerName = onlyOfficeConfig.getDocserviceHeader();
             if (headerName == null || headerName.trim().isEmpty()) {
