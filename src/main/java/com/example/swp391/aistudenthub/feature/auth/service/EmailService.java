@@ -137,7 +137,7 @@ public class EmailService {
                 + "<tr><td style=\"background:#991b1b;padding:18px 24px;color:#fff;font-size:20px;font-weight:700;\">AI Study Hub</td></tr>"
                 + "<tr><td style=\"padding:32px 28px;color:#111827;font-size:15px;line-height:1.7;\">"
                 + "<p>Xin chào " + safeRecipientName + ",</p>"
-                + "<p>Tài liệu <strong>" + safeDocumentTitle + "</strong> đã bị gỡ tự động và không được công khai.</p>"
+                + "<p>Tài liệu <strong>" + safeDocumentTitle + "</strong> đã bị gỡ và không được công khai.</p>"
                 + "<p><strong>Lý do:</strong></p>"
                 + "<div style=\"padding:14px 16px;background:#fef2f2;border-left:4px solid #dc2626;border-radius:4px;\">"
                 + safeReason + "</div>"
